@@ -106,7 +106,7 @@ Route::middleware(['auth'])->group(function () {
 
 
     Route::get('/tests/create', [TestController::class, 'create'])->name('tests.create');
-    Route::post('/tests', [TestController::class, 'store'])->name('tests.store');
+    // Route::post('/tests', [TestController::class, 'store'])->name('tests.store');
     Route::get('/tests', [TestController::class, 'index'])->name('tests.index');
     Route::get('/tests/{id}/edit', [TestController::class, 'edit'])->name('tests.edit');
     Route::put('/tests/{id}', [TestController::class, 'update'])->name('tests.update');
