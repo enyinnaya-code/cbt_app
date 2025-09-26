@@ -9,25 +9,40 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-    public function up()
+    public function up(): void
     {
         Schema::create('students_exams', function (Blueprint $table) {
             $table->id(); // Primary key
-            $table->foreignId('id')->constrained('users')->onDelete('cascade'); // Foreign key for the user (student)
-            $table->foreignId('class_id')->constrained('classes')->onDelete('cascade'); // Foreign key for the class
-            $table->foreignId('test_id')->constrained('tests')->onDelete('cascade'); // Foreign key for the test
-            $table->timestamp('start_time')->useCurrent(); // Automatically set the start time to the current timestamp
-            $table->timestamp('exhausted_time')->nullable(); // Time when the test is exhausted, nullable by default
-            $table->integer('score')->nullable(); // Score for the student, nullable by default
-            $table->integer('test_total_score'); // Total score for the test
-            $table->timestamps(); // created_at and updated_at columns
+
+            // Foreign key for the user (student)
+            $table->foreignId('user_id')
+                  ->constrained('users')
+                  ->onDelete('cascade');
+
+            // Foreign key for the class
+            $table->foreignId('class_id')
+                  ->constrained('classes')
+                  ->onDelete('cascade');
+
+            // Foreign key for the test
+            $table->foreignId('test_id')
+                  ->constrained('tests')
+                  ->onDelete('cascade');
+
+            // Exam timing and results
+            $table->timestamp('start_time')->useCurrent(); 
+            $table->timestamp('exhausted_time')->nullable();
+            $table->integer('score')->nullable();
+            $table->integer('test_total_score');
+
+            $table->timestamps(); // created_at and updated_at
         });
     }
 
     /**
      * Reverse the migrations.
      */
-    public function down()
+    public function down(): void
     {
         Schema::dropIfExists('students_exams');
     }
