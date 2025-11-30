@@ -21,51 +21,7 @@
             <label for="question_text">Question/Text</label>
             <textarea class="summernote" name="question_text" required rows="4">{{ old('question_text', $currentQuestion->question ?? '') }}</textarea>
 
-            <!-- <div id="toolbar">
-                <select class="ql-header">
-                    <option selected></option>
-                    <option value="1"></option>
-                    <option value="2"></option>
-                </select>
-                <select class="ql-font"></select>
-                <select class="ql-size"></select>
-                <button class="ql-bold"></button>
-                <button class="ql-italic"></button>
-                <button class="ql-underline"></button>
-                <button class="ql-strike"></button>
-                <button class="ql-blockquote"></button>
-                <button class="ql-code-block"></button>
-                <button class="ql-list" value="ordered"></button>
-                <button class="ql-list" value="bullet"></button>
-                <button class="ql-indent" value="-1"></button>
-                <button class="ql-indent" value="+1"></button>
-                <select class="ql-color"></select>
-                <select class="ql-background"></select>
-                <select class="ql-align"></select>
-                <button class="ql-link"></button>
-                <button class="ql-image"></button>
-                <button class="ql-video"></button>
-                <button class="ql-clean"></button>
-                <button class="ql-formula"></button>
-                <button type="button" class="btn btn-sm btn-outline-info" data-toggle="modal" data-target="#helpModal" title="Formula Help">
-                    &#10067;
-                </button>
-            </div> -->
-
-            <!-- Quill Editor -->
-            <!-- <div id="editor" style="height: 300px;"></div>
-            <textarea name="question_text" id="question_text" style="display:none;"></textarea> -->
-
-            <!-- Quill editor that user interacts with -->
-            <!-- <div id="editor" style="height: 300px;">{!! old('question_text', $currentQuestion->question ?? '') !!}</div> -->
-            <!-- Hidden textarea (what Laravel sees) -->
-            <!-- <textarea name="question_text" id="question_text" style="display:none;"></textarea> -->
-
-
-
-
-
-
+          
             <div class="form-check mt-2">
                 <input class="form-check-input" type="checkbox" name="is_instruction" id="is_instruction"
                     {{ old('is_instruction', $currentQuestion->not_question ?? false) ? 'checked' : '' }}>

@@ -1,32 +1,16 @@
 @include('includes.head')
 <style>
-    .ql-formula-tooltip {
-        /* Make it position absolute relative to editor */
-        position: absolute !important;
-        top: 50% !important;
-        left: 20% !important;
-        /* Vertical center */
-        left: 50% !important;
-        /* Horizontal center */
-        transform: translate(-50%, -50%) !important;
-        /* Offset to true center */
-        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
-        z-index: 9999;
+    .modal-backdrop {
+        background-color: transparent !important;
+        display: none;
     }
 
-    #editor {
-        position: relative;
-    }
-
-    .ql-snow .ql-tooltip {
-        background-color: #fff;
-        border: 1px solid #ccc;
-        box-shadow: 0px 0px 5px #ddd;
-        color: #444;
-        padding: 5px 12px;
-        white-space: nowrap;
-        position: absolute;
-        left: 20% !important;
+    .modal {
+        position: fixed;
+        top: 10rem;
+        left: 0;
+        z-index: 1050 !important;
+        margin: auto;
     }
 </style>
 
@@ -43,7 +27,8 @@
                 <section class="section mb-5 pb-1 px-0">
                     <div class="col-12">
                         <div class="card">
-                            <form class="needs-validation" method="POST" action="{{ route('questions.store') }}" id="questionForm">
+                            <form class="needs-validation" method="POST" action="{{ route('questions.store') }}"
+                                id="questionForm">
                                 @csrf
                                 <input type="hidden" name="test_id" value="{{ $test->id }}">
                                 <div class="card-body mx-0 px-3 mb-3">
@@ -71,7 +56,8 @@
                                                     <td>{{ $test->schoolClass->name ?? 'N/A' }}</td>
                                                     <td>{{ ucfirst(str_replace('_', ' ', $test->test_type)) }}</td>
                                                     <td>
-                                                        <a href="#" class="btn btn-sm btn-primary" data-toggle="modal" data-target="#commentsModal{{ $test->id }}">
+                                                        <a href="#" class="btn btn-sm btn-primary" data-toggle="modal"
+                                                            data-target="#commentsModal{{ $test->id }}">
                                                             <i class="fas fa-comments" title="View Comments"></i>
                                                         </a>
 
@@ -91,14 +77,152 @@
 
 
                                 @if($test->test_type === 'multiple_choice')
-                                @include('includes.multiple_choice_input')
-                                @elseif($test->test_type === 'combined')
-                                @include('includes.combined_question_input')
-                                @elseif($test->test_type === 'text_input')
-                                @include('includes.text_input_question')
+                                <div class="px-3 card-header text-dark">
+                                    @if (!empty($currentQuestion))
+                                    @if (!$currentQuestion->not_question)
+                                    <h5><strong>Question {{ $questionNumber }}</strong></h5>
+                                    @else
+                                    <h5><strong>Text</strong></h5>
+                                    @endif
+                                    @endif
+                                </div>
+
+
+
+                                <div class="p-3">
+                                    <div class="row px-2" style="gap: 1rem;">
+                                        <div class="form-group col-md-8">
+
+                                            @if (!empty($currentQuestion))
+                                            <input type="hidden" name="question_id" value="{{ $currentQuestion->id }}">
+                                            @endif
+
+                                            <label for="question_text">Question/Text</label>
+                                            <textarea class="summernote" name="question_text" required
+                                                rows="4">{{ old('question_text', $currentQuestion->question ?? '') }}</textarea>
+
+
+                                            <div class="form-check mt-2">
+                                                <input class="form-check-input" type="checkbox" name="is_instruction"
+                                                    id="is_instruction" {{ old('is_instruction',
+                                                    $currentQuestion->not_question ?? false) ? 'checked' : '' }}>
+                                                <label class="form-check-label" for="is_instruction">
+                                                    <em>Check this box if the text is not a question (e.g.,
+                                                        comprehension passage, instruction)</em>
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <div class="col-md-3">
+                                            <!-- Dynamic Option Inputs Container -->
+                                            <label class="form-label">Options</label>
+                                            <div id="options-container">
+                                                @php
+                                                $options = json_decode($currentQuestion->options ?? '{}', true);
+                                                $optionLabels = ['A', 'B', 'C', 'D', 'E'];
+                                                $optionKeys = array_keys($options);
+                                                @endphp
+
+                                                @forelse ($options as $key => $value)
+                                                <div class="form-group mb-2 option-row" data-option="{{ $key }}">
+                                                    <label>Option {{ $key }}</label>
+                                                    <div class="input-group">
+                                                        <input type="text" class="form-control"
+                                                            name="options[{{ $key }}]" value="{{ $value }}">
+                                                        <div class="input-group-append">
+                                                            @if ($loop->last && $loop->count < 5) <button type="button"
+                                                                class="btn btn-sm btn-primary m-1 add-option">+</button>
+                                                                @endif
+                                                                @if ($loop->count > 1)
+                                                                <button type="button"
+                                                                    class="btn btn-sm btn-danger m-1 remove-option">-</button>
+                                                                @endif
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                @empty
+                                                <div class="form-group mb-2 option-row" data-option="A">
+                                                    <label>Option A</label>
+                                                    <div class="input-group">
+                                                        <input type="text" class="form-control" name="options[A]">
+                                                        <div class="input-group-append">
+                                                            <button type="button"
+                                                                class="btn btn-sm btn-primary m-1 add-option">+</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                @endforelse
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="row col-md-6">
+                                        <div class="form-group col-md-6">
+                                            <label for="correct_option">Correct Option</label>
+                                            <select class="form-control" name="correct_option" id="correct_option">
+                                                @foreach ($options as $key => $value)
+                                                <option value="{{ $key }}" {{ (old('correct_option', $currentQuestion->
+                                                    answer ?? '') == $key) ? 'selected' : '' }}>{{ $key }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+
+                                        <div class="form-group col-md-6">
+                                            <label for="mark">Mark</label>
+                                            <input type="number" class="form-control" name="mark" min="1"
+                                                value="{{ old('mark', $currentQuestion->mark ?? '') }}"
+                                                placeholder="Type number here">
+                                        </div>
+                                    </div>
+
+                                    <div class="row justify-content-start px-3" style="gap: 2rem;">
+                                        <div class=" mt-5 pt-5 px-0 mx-0 ">
+                                            <button type="submit" class="btn btn-success px-5">Save</button>
+                                        </div>
+                                        <div class=" mt-5 pt-5 px-0 mx-0">
+                                            <a href="{{ route('questions.index') }}" class="btn btn-primary">Back to
+                                                Manage Questions</a>
+                                        </div>
+                                    </div>
+
+                                    <!-- Dynamic Question Navigator -->
+                                    <div class="mt-4">
+                                        <strong>Jump to Question:</strong>
+                                        @if (!empty($currentQuestion))
+                                        <div class="mb-3">
+                                            <a href="{{ route('questions.set', ['test' => $test->id]) }}"
+                                                class="btn btn-success btn-sm">
+                                                + New Question
+                                            </a>
+                                        </div>
+                                        @endif
+
+                                        <div class="btn-group my-4">
+                                            @php $questionCount = 0; @endphp
+                                            @foreach($test->questions as $q)
+                                            @if (!$q->not_question)
+                                            @php $questionCount++; @endphp
+                                            <a href="{{ route('questions.set', ['test' => $test->id, 'question_id' => $q->id]) }}"
+                                                class="btn btn-outline-secondary p-2 btn-sm {{ isset($currentQuestion) && $q->id === $currentQuestion->id ? 'active' : '' }}">
+                                                {{ $questionCount }}
+                                            </a>
+                                            @else
+                                            <a href="{{ route('questions.set', ['test' => $test->id, 'question_id' => $q->id]) }}"
+                                                class="btn btn-outline-info p-2 btn-sm {{ isset($currentQuestion) && $q->id === $currentQuestion->id ? 'active' : '' }}">
+                                                Text
+                                            </a>
+                                            @endif
+                                            @endforeach
+                                        </div>
+
+                                    </div>
+
+
+                                </div>
                                 @else
                                 <div class="card-body">
-                                    <p class="text-warning">Question input type for <strong>{{ $test->test_type }}</strong> not implemented yet.</p>
+                                    <p class="text-warning">Question input type for <strong>{{ $test->test_type
+                                            }}</strong> not implemented yet.</p>
                                 </div>
                                 @endif
                             </form>
@@ -109,11 +233,13 @@
         </div>
     </div>
     <!-- Modal -->
-    <div class="modal fade" id="commentsModal{{ $test->id }}" tabindex="-1" role="dialog" aria-labelledby="commentsModalLabel{{ $test->id }}" aria-hidden="true">
+    <div class="modal fade" id="commentsModal{{ $test->id }}" tabindex="-1" role="dialog"
+        aria-labelledby="commentsModalLabel{{ $test->id }}" aria-hidden="true">
         <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h6 class="modal-title" id="commentsModalLabel{{ $test->id }}">Comments for {{ $test->test_name }}</h6>
+                    <h6 class="modal-title" id="commentsModalLabel{{ $test->id }}">Comments for {{ $test->test_name }}
+                    </h6>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
@@ -126,7 +252,8 @@
     </div>
 
     <!-- Help Modal -->
-    <div class="modal fade" id="helpModal" tabindex="-1" role="dialog" aria-labelledby="helpModalLabel" aria-hidden="true">
+    <div class="modal fade" id="helpModal" tabindex="-1" role="dialog" aria-labelledby="helpModalLabel"
+        aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" role="document">
             <div class="modal-content">
                 <div class="modal-header">
@@ -183,41 +310,6 @@
 
 
 
-    <!-- Quill Init -->
-    <!-- <script>
-        var quill = new Quill('#editor', {
-            theme: 'snow',
-            modules: {
-                formula: true,
-                toolbar: '#toolbar'
-            }
-        });
-
-        const tooltip = quill.theme.tooltip; // Access tooltip instance
-
-        // Override show method to position tooltip center of editor
-        const originalShow = tooltip.show.bind(tooltip);
-        tooltip.show = function() {
-            originalShow();
-
-            // Get editor position and size
-            const editorBounds = quill.container.getBoundingClientRect();
-
-            // Calculate center position
-            const top = editorBounds.height / 2;
-            const left = editorBounds.width / 2;
-
-            // Position tooltip inside editor container
-            this.root.style.position = 'absolute';
-            this.root.style.top = `${top}px`;
-            this.root.style.left = `${left}px`;
-            this.root.style.transform = 'translate(-50%, -50%)';
-        };
-
-         document.querySelector('form').addEventListener('submit', function() {
-    document.querySelector('#question_text').value = quill.root.innerHTML.trim();
-  });
-    </script> -->
 
     <script>
         document.addEventListener("DOMContentLoaded", function() {
@@ -469,13 +561,51 @@
         });
     </script>
 
-    <!-- <script>
-        // Re-render math when modal opens
-        $('#helpModal').on('shown.bs.modal', function() {
-            if (window.MathJax) MathJax.typeset();
-        });
+    <footer class="main-footer">
+        <div class="footer-right">
+            <a href="templateshub.net">All Rights Reserved</a></a>
+        </div>
+        <div class="footer-right">
+        </div>
+    </footer>
+    </div>
+    </div>
+    <!-- @include('includes.footer') -->
+    <!-- General JS Scripts -->
+    <script src="{{ asset('js/app.min.js') }}"></script>
+    <!-- JS Libraries -->
+    <!-- Page Specific JS File -->
+    <!-- Template JS File -->
+    <script src="{{ asset('js/scripts.js') }}"></script>
+    <!-- Custom JS File -->
+    <script src="{{ asset('js/custom.js') }}"></script>
 
-        
-    </script> -->
 
-    @include('includes.edit_footer')
+
+    <!-- Add this just before closing </body> tag for Toastr scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/js/toastr.min.js"></script>
+
+    <!-- Display Toastr Notifications -->
+    @if(session('error'))
+    <script>
+        toastr.error("{{ session('error') }}");
+    </script>
+    @elseif(session('success'))
+    <script>
+        toastr.success("{{ session('success') }}");
+    </script>
+    @elseif(session('info'))
+    <script>
+        toastr.info("{{ session('info') }}");
+    </script>
+    @endif
+    <script src="{{ asset('bundles/summernote/summernote-bs4.js') }}"></script>
+
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+    </script>
+
+
+</body>
+
+</html>
