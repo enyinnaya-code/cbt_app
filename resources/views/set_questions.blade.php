@@ -12,6 +12,50 @@
         z-index: 1050 !important;
         margin: auto;
     }
+
+    .question-navigator-wrapper {
+        overflow-x: auto;
+        overflow-y: hidden;
+        white-space: nowrap;
+        -webkit-overflow-scrolling: touch;
+        /* Smooth scrolling on iOS */
+        scrollbar-width: thin;
+        /* Firefox */
+        scrollbar-color: #888 #f1f1f1;
+        /* Firefox */
+    }
+
+    /* Custom scrollbar for webkit browsers */
+    .question-navigator-wrapper::-webkit-scrollbar {
+        height: 8px;
+    }
+
+    .question-navigator-wrapper::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+
+    .question-navigator-wrapper::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+    }
+
+    .question-navigator-wrapper::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+
+    /* Ensure button group stays inline */
+    .question-navigator-wrapper .btn-group {
+        display: inline-flex;
+        flex-wrap: nowrap;
+    }
+
+    /* Add some padding for better mobile experience */
+    @media (max-width: 768px) {
+        .question-navigator-wrapper {
+            padding-bottom: 10px;
+        }
+    }
 </style>
 
 <body>
@@ -197,24 +241,26 @@
                                         </div>
                                         @endif
 
-                                        <div class="btn-group my-4">
-                                            @php $questionCount = 0; @endphp
-                                            @foreach($test->questions as $q)
-                                            @if (!$q->not_question)
-                                            @php $questionCount++; @endphp
-                                            <a href="{{ route('questions.set', ['test' => $test->id, 'question_id' => $q->id]) }}"
-                                                class="btn btn-outline-secondary p-2 btn-sm {{ isset($currentQuestion) && $q->id === $currentQuestion->id ? 'active' : '' }}">
-                                                {{ $questionCount }}
-                                            </a>
-                                            @else
-                                            <a href="{{ route('questions.set', ['test' => $test->id, 'question_id' => $q->id]) }}"
-                                                class="btn btn-outline-info p-2 btn-sm {{ isset($currentQuestion) && $q->id === $currentQuestion->id ? 'active' : '' }}">
-                                                Text
-                                            </a>
-                                            @endif
-                                            @endforeach
+                                        <!-- Wrap the btn-group in a scrollable container -->
+                                        <div class="question-navigator-wrapper">
+                                            <div class="btn-group my-4">
+                                                @php $questionCount = 0; @endphp
+                                                @foreach($test->questions as $q)
+                                                @if (!$q->not_question)
+                                                @php $questionCount++; @endphp
+                                                <a href="{{ route('questions.set', ['test' => $test->id, 'question_id' => $q->id]) }}"
+                                                    class="btn btn-outline-secondary p-2 btn-sm {{ isset($currentQuestion) && $q->id === $currentQuestion->id ? 'active' : '' }}">
+                                                    {{ $questionCount }}
+                                                </a>
+                                                @else
+                                                <a href="{{ route('questions.set', ['test' => $test->id, 'question_id' => $q->id]) }}"
+                                                    class="btn btn-outline-info p-2 btn-sm {{ isset($currentQuestion) && $q->id === $currentQuestion->id ? 'active' : '' }}">
+                                                    Text
+                                                </a>
+                                                @endif
+                                                @endforeach
+                                            </div>
                                         </div>
-
                                     </div>
 
 
