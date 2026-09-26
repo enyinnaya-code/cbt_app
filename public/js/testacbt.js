@@ -38,6 +38,9 @@
     document.querySelectorAll('.usermenu.open').forEach(function (m) { if (!toggle || !m.contains(toggle)) { m.classList.remove('open'); } });
     if (toggle) { toggle.closest('.usermenu').classList.toggle('open'); }
 
+    var play = e.target.closest('.video-play');
+    if (play) { loadVideo(play.closest('.video-frame')); return; }
+
     var copier = e.target.closest('[data-copy]');
     if (copier) { copyText(copier.getAttribute('data-copy'), copier); return; }
 
@@ -54,6 +57,24 @@
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') { document.querySelectorAll('.usermenu.open').forEach(function (m) { m.classList.remove('open'); }); }
   });
+
+  // Videos load only when played: the page stays fast and no other site is contacted before then.
+  // The address comes from the server (built from the video id for YouTube, Facebook, X or TikTok only).
+  function loadVideo(frame) {
+    if (!frame || frame.querySelector('iframe')) { return; }
+    var src = frame.getAttribute('data-embed') || '';
+    if (!/^https:\/\/(www\.youtube-nocookie\.com|www\.facebook\.com|platform\.twitter\.com|www\.tiktok\.com)\//.test(src)) { return; }
+    var iframe = document.createElement('iframe');
+    iframe.src = src;
+    iframe.title = frame.getAttribute('data-title') || 'Video';
+    iframe.loading = 'lazy';
+    iframe.allow = 'autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write';
+    iframe.allowFullscreen = true;
+    iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-presentation allow-popups allow-popups-to-escape-sandbox');
+    frame.innerHTML = '';
+    frame.appendChild(iframe);
+  }
 
   // Copy a link and say so. Falls back to a prompt where the clipboard is blocked (older browsers, plain http).
   function copyText(text, button) {

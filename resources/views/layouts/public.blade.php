@@ -5,6 +5,7 @@
         ['News', route('news'), 'news'],
         ['Scholarships', route('scholarships'), 'scholarships'],
         ['Events', route('events'), 'events'],
+        ['Videos', route('videos'), 'videos'],
         ['Blog', route('blog'), 'blog'],
         ['Pricing', route('pricing'), 'pricing'],
     ];
@@ -43,7 +44,7 @@
                 <p style="margin-top:10px;max-width:34ch">Practise {{ app(\App\Support\SiteInfo::class)->examNames() }} past questions, on the web or on your phone.</p>
             </div>
             <div><h4>Learn</h4><a href="{{ route('register') }}">Create a free account</a><a href="{{ route('pricing') }}">Pricing</a><a href="{{ route('download') }}">Get the app</a></div>
-            <div><h4>Stay informed</h4><a href="{{ route('news') }}">News</a><a href="{{ route('scholarships') }}">Scholarships</a><a href="{{ route('events') }}">Events</a><a href="{{ route('blog') }}">Blog</a></div>
+            <div><h4>Stay informed</h4><a href="{{ route('news') }}">News</a><a href="{{ route('scholarships') }}">Scholarships</a><a href="{{ route('events') }}">Events</a><a href="{{ route('videos') }}">Videos</a><a href="{{ route('blog') }}">Blog</a></div>
             <div><h4>Account</h4><a href="{{ route('login') }}">Sign in</a><a href="{{ route('register') }}">Sign up</a>@if($support = \App\Models\Setting::get('support.email'))<a href="mailto:{{ $support }}">{{ $support }}</a>@endif</div>
         </div>
         &copy; {{ date('Y') }} TestaCBT

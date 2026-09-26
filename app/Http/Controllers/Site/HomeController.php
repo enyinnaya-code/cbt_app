@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\Exam;
 use App\Models\Post;
 use App\Models\Setting;
+use App\Models\Video;
 use Illuminate\Http\Request;
 
 class HomeController extends Controller
@@ -26,6 +27,7 @@ class HomeController extends Controller
             'news' => $news,
             'events' => Event::live()->upcoming()->orderBy('starts_on')->limit(5)->get(),
             'scholarships' => $scholarships,
+            'videos' => Video::live()->with('exam:id,name')->orderByDesc('is_featured')->orderByDesc('id')->limit(3)->get(),
             'stores' => $this->stores(),
             'fromPrice' => \App\Services\Pricing::defaultPrice(),
             'freeQuestions' => \App\Services\Pricing::defaultFreeQuestions(),

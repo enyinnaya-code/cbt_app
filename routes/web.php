@@ -41,6 +41,7 @@ Route::get('/scholarships', [Site\PostController::class, 'index'])->defaults('pa
 Route::get('/blog', [Site\PostController::class, 'index'])->defaults('page', 'blog')->name('blog');
 Route::get('/articles/{slug}', [Site\PostController::class, 'show'])->name('articles.show');
 Route::get('/events', [Site\EventController::class, 'index'])->name('events');
+Route::get('/videos', [Site\VideoController::class, 'index'])->name('videos');
 Route::get('/pricing', [Site\PricingController::class, 'index'])->name('pricing');
 // Paystack sends the student back here; it checks with Paystack itself, so no sign-in is needed to land on it.
 Route::get('/checkout/callback', [Student\CheckoutController::class, 'callback'])->name('checkout.callback');
@@ -118,6 +119,7 @@ Route::middleware(['auth'])->group(function () {
             Route::post('subjects', [Console\ExamController::class, 'storeSubject'])->name('subjects.store');
 
             Route::resource('posts', Console\PostController::class)->except('show');
+            Route::resource('videos', Console\VideoController::class)->except('show');
             Route::resource('events', Console\EventController::class)->except('show');
             Route::get('settings', [Console\SettingsController::class, 'edit'])->name('settings.edit');
             Route::put('settings', [Console\SettingsController::class, 'update'])->name('settings.update');

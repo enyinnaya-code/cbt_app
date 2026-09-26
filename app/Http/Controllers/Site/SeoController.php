@@ -45,6 +45,7 @@ class SeoController extends Controller
             [route('scholarships'), Post::live()->where('category', 'scholarship')->max('updated_at'), 'daily', '0.8'],
             [route('blog'), Post::live()->where('category', 'blog')->max('updated_at'), 'weekly', '0.6'],
             [route('events'), null, 'weekly', '0.7'],
+            [route('videos'), \App\Models\Video::live()->max('updated_at'), 'weekly', '0.6'],
             [route('pricing'), null, 'monthly', '0.7'],
         ];
 

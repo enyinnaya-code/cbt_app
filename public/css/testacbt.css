@@ -364,3 +364,20 @@ table.table{width:100%;border-collapse:collapse;font-size:14px}
 .install-help summary{cursor:pointer;font-weight:700;font-size:14px}
 .install-help ol{margin:8px 0 2px;padding-left:20px;display:grid;gap:4px;font-size:14px}
 .install-help details:target{outline:2px solid #fff}
+/* Videos: a card with a play button that loads the player when pressed */
+.video-card{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:20px;overflow:hidden}
+.video-frame{position:relative;aspect-ratio:16/9;background:#0E1A14}
+.video-frame.tall{aspect-ratio:9/14;max-height:560px;margin:0 auto;width:100%}
+.video-frame.post{aspect-ratio:4/5}
+.video-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}
+.video-play{position:absolute;inset:0;width:100%;height:100%;border:0;padding:0;background:transparent;cursor:pointer;display:grid;place-items:center;color:#fff}
+.video-play img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.video-play::after{content:"";position:absolute;inset:0;background:rgba(0,0,0,.18);transition:background .15s}
+.video-play:hover::after{background:rgba(0,0,0,.05)}
+.video-badge{position:relative;z-index:1;width:64px;height:64px;border-radius:50%;background:var(--primary);color:var(--on-primary);display:grid;place-items:center;box-shadow:0 6px 20px rgba(0,0,0,.35)}
+.video-badge .ic{width:26px;height:26px;fill:currentColor;stroke:none;margin-left:3px}
+.video-name{position:absolute;z-index:1;left:0;right:0;bottom:16px;text-align:center;font-weight:700;font-size:14px;letter-spacing:.04em;text-transform:uppercase;opacity:.85}
+.video-play:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
+.video-card .pc-body{padding:16px 18px 18px;display:flex;flex-direction:column;gap:8px;flex:1}
+.video-card h3{font-family:var(--font-display);font-size:18px;font-weight:700;line-height:1.25}
+.video-card .sum{color:var(--muted);font-size:14px}

@@ -75,6 +75,16 @@
     @endif
 </section>
 
+@if($videos->isNotEmpty())
+<section class="section" id="videos">
+    <div class="section-head">
+        <div><span class="eyebrow">Watch</span><h2 class="h1" style="font-size:clamp(24px,3.4vw,32px)">Videos</h2><p>Lessons, exam tips and updates.</p></div>
+        <a class="link" href="{{ route('videos') }}">All videos</a>
+    </div>
+    <div class="post-grid">@foreach($videos as $video)@include('site.videos._card')@endforeach</div>
+</section>
+@endif
+
 <section class="section split" id="events">
     <div>
         <div class="section-head" style="margin-bottom:6px">

@@ -21,7 +21,7 @@
             ...($user->isAdmin() ? [
                 ['Payments', 'console.payments.index', 'card', 'console.payments.*'],
                 ['Exams', 'console.exams.index', 'target', 'console.exams.*'],
-                ['Content', 'console.posts.index', 'news', ['console.posts.*', 'console.events.*', 'console.settings.*']],
+                ['Content', 'console.posts.index', 'news', ['console.posts.*', 'console.videos.*', 'console.events.*', 'console.settings.*']],
                 ['Users', 'console.users.index', 'users', 'console.users.*'],
             ] : []),
         ]
