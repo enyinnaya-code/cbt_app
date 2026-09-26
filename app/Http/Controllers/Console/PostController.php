@@ -140,7 +140,12 @@ class PostController extends Controller
     private function storeCover(UploadedFile $file): string
     {
         $name = Str::random(24) . '.' . ($file->guessExtension() ?: 'jpg');
-        $file->move(public_path(self::COVER_DIR), $name);
+        try {
+            $file->move(public_path(self::COVER_DIR), $name);
+        } catch (\Symfony\Component\HttpFoundation\File\Exception\FileException) {
+            // Nearly always the server folder is not writable by the web user. Say so, instead of a server error page.
+            throw \Illuminate\Validation\ValidationException::withMessages(['cover' => 'The picture could not be saved because the server folder public/' . self::COVER_DIR . ' is not writable. Ask whoever runs the server to fix its permissions, or save the article without a cover picture.']);
+        }
 
         return self::COVER_DIR . '/' . $name;
     }

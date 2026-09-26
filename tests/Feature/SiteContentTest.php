@@ -305,6 +305,23 @@ class SiteContentTest extends TestCase
         $this->assertFileDoesNotExist($second);
     }
 
+    public function test_an_unwritable_upload_folder_gives_a_clear_message_not_a_server_error(): void
+    {
+        $admin = $this->makeUser(2);
+        $folder = public_path('uploads/posts');
+        @mkdir(dirname($folder), 0777, true);
+        if (is_dir($folder) && ! @rmdir($folder)) { $this->markTestSkipped('public/uploads/posts has files in it.'); }
+        file_put_contents($folder, 'not a folder');   // a file where the folder should be, so it cannot be created
+
+        try {
+            $this->actingAs($admin)->post('/console/posts', $this->form(['cover' => UploadedFile::fake()->image('a.jpg', 800, 450)]))
+                ->assertSessionHasErrors('cover');
+            $this->assertSame(0, Post::count());
+        } finally {
+            unlink($folder);
+        }
+    }
+
     public function test_deleting_an_article_removes_it_and_its_picture(): void
     {
         $admin = $this->makeUser(2);
