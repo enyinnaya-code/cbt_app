@@ -2,13 +2,50 @@
 
 @section('title', $post->title)
 
+@php
+    $site = app(\App\Support\SiteInfo::class);
+    $url = route('articles.show', $post->slug);
+    $image = $post->coverUrl() ?: asset('og-default.png');
+    $listName = $post->category === 'scholarship' ? 'Scholarships' : ($post->category === 'blog' ? 'Blog' : 'News');
+    $listUrl = route(\App\Models\Post::categories()[$post->category]['path'] ?? 'news');
+
+    $structured = [
+        '@context' => 'https://schema.org',
+        '@graph' => [
+            array_filter([
+                '@type' => $post->category === 'blog' ? 'BlogPosting' : 'NewsArticle',
+                'headline' => \Illuminate\Support\Str::limit($post->title, 110, ''),
+                'description' => $post->summary(200),
+                'image' => [$image],
+                'datePublished' => $post->published_at?->toAtomString(),
+                'dateModified' => $post->updated_at->toAtomString(),
+                'mainEntityOfPage' => ['@type' => 'WebPage', '@id' => $url],
+                'author' => ['@type' => $post->author ? 'Person' : 'Organization', 'name' => $post->author?->name ?? 'TestaCBT'],
+                'publisher' => $site->organization(),
+                'articleSection' => $post->categoryLabel(),
+            ]),
+            [
+                '@type' => 'BreadcrumbList',
+                'itemListElement' => [
+                    ['@type' => 'ListItem', 'position' => 1, 'name' => 'TestaCBT', 'item' => url('/')],
+                    ['@type' => 'ListItem', 'position' => 2, 'name' => $listName, 'item' => $listUrl],
+                    ['@type' => 'ListItem', 'position' => 3, 'name' => $post->title, 'item' => $url],
+                ],
+            ],
+        ],
+    ];
+@endphp
+
+@section('meta_description', $post->summary(200))
+@section('og_type', 'article')
+@section('og_image', $image)
+@section('robots', $preview ? 'noindex, nofollow' : '')
+
 @push('head')
-    <meta name="description" content="{{ $post->summary(200) }}">
-    <meta property="og:type" content="article">
-    <meta property="og:title" content="{{ $post->title }}">
-    <meta property="og:description" content="{{ $post->summary(200) }}">
-    @if($post->coverUrl())<meta property="og:image" content="{{ $post->coverUrl() }}">@endif
-    <meta name="twitter:card" content="summary_large_image">
+    <meta property="article:published_time" content="{{ $post->published_at?->toAtomString() }}">
+    <meta property="article:modified_time" content="{{ $post->updated_at->toAtomString() }}">
+    <meta property="article:section" content="{{ $post->categoryLabel() }}">
+    {!! \App\Support\SiteInfo::jsonLd($structured) !!}
 @endpush
 
 @section('content')
@@ -27,7 +64,7 @@
 
     @include('site._share')
 
-    @if($post->coverUrl())<img class="hero-img" src="{{ $post->coverUrl() }}" alt="">@endif
+    @if($post->coverUrl())<img class="hero-img" src="{{ $post->coverUrl() }}" alt="{{ $post->title }}" width="1200" height="675" fetchpriority="high">@endif
 
     @if($post->category === 'scholarship' && ($post->deadline || $post->source || $post->link_url))
         <div class="facts">
@@ -45,7 +82,7 @@
     @endif
 
     <div class="card row between wrap" style="background:var(--primary-soft);border:0">
-        <div><p class="h3">Ready to practise?</p><p class="small muted">Past questions for WAEC, NECO, JAMB, Post-UTME and IGCSE, free to start.</p></div>
+        <div><p class="h3">Ready to practise?</p><p class="small muted">Past questions for {{ app(\App\Support\SiteInfo::class)->examNames() }}, free to start.</p></div>
         <a class="btn btn-p" href="{{ auth()->check() ? route('practice.index') : route('register') }}">{{ auth()->check() ? 'Start practising' : 'Create a free account' }}</a>
     </div>
 </article>

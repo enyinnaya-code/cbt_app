@@ -1,5 +1,7 @@
 @extends('layouts.base')
 
+@section('robots', 'noindex, nofollow')
+
 @php
     $user = auth()->user();
     $isStaff = $user->canManageQuestions();

@@ -30,6 +30,11 @@ Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
 });
 
+// For search engines and feed readers.
+Route::get('/robots.txt', [Site\SeoController::class, 'robots']);
+Route::get('/sitemap.xml', [Site\SeoController::class, 'sitemap']);
+Route::get('/feed.xml', [Site\SeoController::class, 'feed']);
+
 // Public pages: news, scholarships, blog, events and pricing. Open to everyone, signed in or not.
 Route::get('/news', [Site\PostController::class, 'index'])->defaults('page', 'news')->name('news');
 Route::get('/scholarships', [Site\PostController::class, 'index'])->defaults('page', 'scholarships')->name('scholarships');

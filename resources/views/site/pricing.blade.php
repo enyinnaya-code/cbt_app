@@ -1,6 +1,7 @@
 @extends('layouts.public')
 
-@section('title', 'Pricing')
+@section('title', 'Pricing: free questions in every subject')
+@section('meta_description', 'Try free questions in every subject, then unlock only the subjects you need. Pay once by card or bank transfer, no subscription.')
 
 @php $tones = ['c-a', 'c-b', 'c-p', 'c-g']; @endphp
 

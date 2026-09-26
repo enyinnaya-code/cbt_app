@@ -1,6 +1,18 @@
 @extends('layouts.public')
 
-@section('title', 'Pass WAEC, NECO, JAMB, Post-UTME and IGCSE')
+@php $siteInfo = app(\App\Support\SiteInfo::class); @endphp
+@section('title', 'Pass ' . $siteInfo->examNames())
+@section('meta_description', $siteInfo->description())
+
+@push('head')
+    {!! \App\Support\SiteInfo::jsonLd([
+        '@context' => 'https://schema.org',
+        '@graph' => [
+            $siteInfo->organization() + ['@id' => url('/') . '#organization'],
+            ['@type' => 'WebSite', 'name' => 'TestaCBT', 'url' => url('/'), 'inLanguage' => 'en-NG', 'publisher' => ['@id' => url('/') . '#organization']],
+        ],
+    ]) !!}
+@endpush
 
 @section('content')
 <section class="hero">
@@ -8,7 +20,7 @@
         <div class="stack" style="gap:14px">
             <span class="badge g" style="align-self:flex-start"><x-icon name="check" size="s"/>Past questions, made simple</span>
             <h1>Pass your exam. Start free.</h1>
-            <p class="muted" style="font-size:18px;max-width:52ch">Practise real past questions for WAEC, NECO, JAMB, Post-UTME and IGCSE, see the right answer straight away, and read a simple explanation in English or Pidgin. Works offline on the app.</p>
+            <p class="muted" style="font-size:18px;max-width:52ch">Practise real past questions for {{ $siteInfo->examNames() }}, see the right answer straight away, and read a simple explanation in English or Pidgin. Works offline on the app.</p>
         </div>
         <div class="row wrap">
             @auth

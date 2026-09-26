@@ -1,6 +1,8 @@
 @extends('layouts.public')
 
 @section('title', $heading)
+@section('meta_description', $intro)
+@section('robots', $search !== '' ? 'noindex, follow' : '')
 
 @section('content')
 <section class="section" style="padding-top:12px">

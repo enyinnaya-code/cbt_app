@@ -40,7 +40,7 @@
         <div class="footer-cols">
             <div>
                 <a class="brand" href="{{ route('welcome') }}" style="padding:0"><span class="brand-mark"><x-icon name="check" size="s"/></span>TestaCBT</a>
-                <p style="margin-top:10px;max-width:34ch">Practise WAEC, NECO, JAMB, Post-UTME and IGCSE past questions, on the web or on your phone.</p>
+                <p style="margin-top:10px;max-width:34ch">Practise {{ app(\App\Support\SiteInfo::class)->examNames() }} past questions, on the web or on your phone.</p>
             </div>
             <div><h4>Learn</h4><a href="{{ route('register') }}">Create a free account</a><a href="{{ route('pricing') }}">Pricing</a><a href="{{ route('download') }}">Get the app</a></div>
             <div><h4>Stay informed</h4><a href="{{ route('news') }}">News</a><a href="{{ route('scholarships') }}">Scholarships</a><a href="{{ route('events') }}">Events</a><a href="{{ route('blog') }}">Blog</a></div>

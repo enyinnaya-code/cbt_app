@@ -19,7 +19,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // One per request, so the list of exams is looked up once however many places print it.
+        $this->app->singleton(\App\Support\SiteInfo::class);
     }
 
     /**

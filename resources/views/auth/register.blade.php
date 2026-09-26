@@ -1,6 +1,7 @@
 @extends('layouts.public')
 
 @section('title', 'Create account')
+@section('robots', 'noindex, follow')
 
 @section('content')
 <div class="auth-card stack" style="gap:24px">
