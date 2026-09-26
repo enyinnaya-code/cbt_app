@@ -5,6 +5,9 @@
     $isStaff = $user->canManageQuestions();
     $initials = collect(preg_split('/\s+/', trim($user->name)))->filter()->take(2)->map(fn ($p) => mb_strtoupper(mb_substr($p, 0, 1)))->implode('');
 
+    // Old school tests waiting to be turned into papers (admins only; hidden once there are none).
+    $legacyCount = $isStaff && $user->isAdmin() ? app(\App\Services\LegacyTagger::class)->untaggedCount() : 0;
+
     // [label, route name, icon, active pattern]
     $nav = $isStaff
         ? [
@@ -12,6 +15,7 @@
             ['Papers', 'console.papers.index', 'layers', 'console.papers.*'],
             ['Topics', 'console.topics.index', 'book', 'console.topics.*'],
             ['Packs', 'console.packs.index', 'download', 'console.packs.*'],
+            ...($legacyCount ? [['Old tests', 'console.legacy.index', 'refresh', 'console.legacy.*']] : []),
             ...($user->isAdmin() ? [['Users', 'console.users.index', 'users', 'console.users.*']] : []),
         ]
         : [
@@ -44,7 +48,7 @@
             @endforeach
         </nav>
         <div class="topbar-r">
-            @if($isStaff)<span class="badge n">{{ ucfirst($user->role) }}</span>@endif
+            @if($isStaff)<span class="badge neutral">{{ ucfirst($user->role) }}</span>@endif
             <div class="usermenu">
                 <button type="button" class="avatar sm" data-menu-toggle aria-label="Account menu" style="border:0;cursor:pointer">
                     @if($user->avatar_url)<img src="{{ $user->avatar_url }}" alt="">@else{{ $initials }}@endif

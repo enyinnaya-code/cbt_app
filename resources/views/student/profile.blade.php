@@ -16,7 +16,7 @@
     <div class="grow">
         <p class="h2">{{ $user->name }}</p>
         <p class="small muted">{{ $user->email }}</p>
-        @if($user->google_id)<span class="badge n" style="margin-top:6px">Signed in with Google</span>@endif
+        @if($user->google_id)<span class="badge neutral" style="margin-top:6px">Signed in with Google</span>@endif
     </div>
 </div>
 

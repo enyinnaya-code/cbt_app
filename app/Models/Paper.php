@@ -44,4 +44,18 @@ class Paper extends Model
     {
         return $query->where('status', self::PUBLISHED);
     }
+
+    /**
+     * Admins can edit any paper. Examiners can only work on drafts, so a live paper cannot change under
+     * students' feet without an admin's say.
+     */
+    public function isEditableBy(User $user): bool
+    {
+        return $user->isAdmin() || ($user->canManageQuestions() && $this->status === self::DRAFT);
+    }
+
+    public function label(): string
+    {
+        return $this->title ?: "{$this->exam->name} {$this->subject->name} {$this->year}";
+    }
 }

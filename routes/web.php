@@ -14,6 +14,7 @@ use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\SummernoteController;
 use App\Http\Controllers\Student;
+use App\Http\Controllers\Console;
 
 
 
@@ -45,6 +46,48 @@ Route::middleware(['auth'])->group(function () {
     })->name('calendar');
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    // Console for examiners and admins
+    Route::middleware('role:admin,examiner')->prefix('console')->name('console.')->group(function () {
+        Route::get('papers', [Console\PaperController::class, 'index'])->name('papers.index');
+        Route::get('papers/create', [Console\PaperController::class, 'create'])->name('papers.create');
+        Route::post('papers', [Console\PaperController::class, 'store'])->name('papers.store');
+        Route::get('papers/{paper}', [Console\PaperController::class, 'show'])->name('papers.show');
+        Route::put('papers/{paper}', [Console\PaperController::class, 'update'])->name('papers.update');
+        Route::delete('papers/{paper}', [Console\PaperController::class, 'destroy'])->name('papers.destroy');
+
+        Route::get('papers/{paper}/questions/create', [Console\QuestionController::class, 'create'])->name('questions.create');
+        Route::post('papers/{paper}/questions', [Console\QuestionController::class, 'store'])->name('questions.store');
+        Route::get('questions/{question}/edit', [Console\QuestionController::class, 'edit'])->name('questions.edit');
+        Route::put('questions/{question}', [Console\QuestionController::class, 'update'])->name('questions.update');
+        Route::delete('questions/{question}', [Console\QuestionController::class, 'destroy'])->name('questions.destroy');
+
+        Route::get('import/sample', [Console\ImportController::class, 'sample'])->name('import.sample');
+        Route::get('papers/{paper}/import', [Console\ImportController::class, 'create'])->name('import.create');
+        Route::post('papers/{paper}/import', [Console\ImportController::class, 'store'])->name('import.store');
+
+        Route::get('topics', [Console\TopicController::class, 'index'])->name('topics.index');
+        Route::post('topics', [Console\TopicController::class, 'store'])->name('topics.store');
+        Route::put('topics/{topic}', [Console\TopicController::class, 'update'])->name('topics.update');
+        Route::delete('topics/{topic}', [Console\TopicController::class, 'destroy'])->name('topics.destroy');
+
+        Route::get('packs', [Console\PackController::class, 'index'])->name('packs.index');
+
+        // Admin only: publishing changes what students see; the rest change accounts or move old data.
+        Route::middleware('role:admin')->group(function () {
+            Route::post('papers/{paper}/publish', [Console\PaperController::class, 'publish'])->name('papers.publish');
+            Route::post('papers/{paper}/unpublish', [Console\PaperController::class, 'unpublish'])->name('papers.unpublish');
+            Route::post('packs/rebuild', [Console\PackController::class, 'rebuild'])->name('packs.rebuild');
+
+            Route::get('legacy', [Console\LegacyController::class, 'index'])->name('legacy.index');
+            Route::post('legacy/{test}', [Console\LegacyController::class, 'store'])->name('legacy.store');
+
+            Route::get('users', [Console\UserController::class, 'index'])->name('users.index');
+            Route::post('users', [Console\UserController::class, 'store'])->name('users.store');
+            Route::patch('users/{user}/role', [Console\UserController::class, 'role'])->name('users.role');
+            Route::patch('users/{user}/toggle', [Console\UserController::class, 'toggle'])->name('users.toggle');
+        });
+    });
 
     // Student area
     Route::prefix('practice')->name('practice.')->group(function () {

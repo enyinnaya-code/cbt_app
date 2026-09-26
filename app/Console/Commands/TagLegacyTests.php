@@ -3,10 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Models\Exam;
-use App\Models\Paper;
-use App\Models\Question;
 use App\Models\Subject;
 use App\Models\Test;
+use App\Services\LegacyTagger;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -21,10 +20,10 @@ class TagLegacyTests extends Command
 
     protected $description = 'Attach questions from pre-TestaCBT school tests to exam/subject/year papers';
 
-    public function handle(): int
+    public function handle(LegacyTagger $tagger): int
     {
         if ($path = $this->option('template')) {
-            return $this->writeTemplate($path);
+            return $this->writeTemplate($path, $tagger);
         }
 
         $file = $this->argument('file');
@@ -59,26 +58,13 @@ class TagLegacyTests extends Command
                 if (! $test) { $problems[] = "line $line: no legacy test with id '$id'"; continue; }
                 if (! $exam) { $problems[] = "line $line: unknown exam '$examName'"; continue; }
                 if (! $subject) { $problems[] = "line $line: unknown subject '$subjectName'"; continue; }
-                if (! ctype_digit($year) || (int) $year < 1970 || (int) $year > (int) date('Y') + 1) {
+                if (! LegacyTagger::yearIsValid($year)) {
                     $problems[] = "line $line: bad year '$year'"; continue;
                 }
 
-                $paper = Paper::firstOrCreate(
-                    ['legacy_test_id' => $test->id],
-                    [
-                        'exam_id' => $exam->id,
-                        'subject_id' => $subject->id,
-                        'year' => (int) $year,
-                        'title' => $test->test_name,
-                        'duration_minutes' => $test->duration,
-                        'created_by' => $test->created_by,
-                        'status' => $this->option('publish') ? Paper::PUBLISHED : Paper::DRAFT,
-                        'published_at' => $this->option('publish') ? now() : null,
-                    ]
-                );
-                $paper->wasRecentlyCreated && $created++;
-
-                $moved += Question::where('test_id', $test->id)->whereNull('paper_id')->update(['paper_id' => $paper->id]);
+                $result = $tagger->tag($test, $exam, $subject, (int) $year, (bool) $this->option('publish'));
+                $result['created'] && $created++;
+                $moved += $result['moved'];
             }
 
             if ($problems) {
@@ -109,15 +95,14 @@ class TagLegacyTests extends Command
             ?? $exam->subjects->first(fn (Subject $s) => $s->pivot->display_name && Str::slug($s->pivot->display_name) === $slug);
     }
 
-    private function writeTemplate(string $path): int
+    private function writeTemplate(string $path, LegacyTagger $tagger): int
     {
-        $tagged = Paper::whereNotNull('legacy_test_id')->pluck('legacy_test_id');
-        $tests = Test::whereNotIn('id', $tagged)->orderBy('id')->get();
+        $tests = $tagger->untagged();
 
         $out = fopen($path, 'w');
         fputcsv($out, ['legacy_test_id', 'exam', 'subject', 'year', 'test_name', 'questions']);
         foreach ($tests as $t) {
-            fputcsv($out, [$t->id, '', '', '', $t->test_name, Question::where('test_id', $t->id)->count()]);
+            fputcsv($out, [$t->id, '', '', '', $t->test_name, $t->question_count]);
         }
         fclose($out);
 
