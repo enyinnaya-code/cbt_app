@@ -33,6 +33,35 @@ class QuestionSelector
         return $this->pick($candidates, $count, keepOrder: $year !== null, seed: $seed);
     }
 
+    /**
+     * Ids for one subject of a mock exam (all years mixed, passage groups kept together).
+     *
+     * @return array<int, int>
+     */
+    public function mockIds(Exam $exam, Subject $subject, int $count, ?int $seed = null): array
+    {
+        $candidates = $this->candidates(fn ($paper) => $paper->where('exam_id', $exam->id)->where('subject_id', $subject->id));
+
+        return $this->choose($candidates, $count, keepOrder: false, seed: $seed)->pluck('id')->all();
+    }
+
+    /**
+     * Rebuilds a stored question list in exactly the order given. Used to show a mock exam again after a refresh.
+     * Without $withKey the answer and explanations are left out, so the browser cannot peek during the exam.
+     */
+    public function byIds(array $ids, bool $withKey): array
+    {
+        if (! $ids) { return ['questions' => [], 'passages' => []]; }
+
+        $questions = Question::whereIn('id', $ids)->with(['topic:id,name', 'paper:id,year'])->get()->keyBy('id');
+        $map = $this->passageMap($questions->pluck('paper_id')->unique()->all());
+
+        $ordered = collect($ids)->map(fn ($id) => $questions->get($id))->filter()
+            ->each(fn (Question $q) => $q->setAttribute('passage_id', $map[$q->id] ?? null))->values();
+
+        return $this->payload($ordered, $withKey);
+    }
+
     public function saved(User $user, int $count, ?int $seed = null): array
     {
         $ids = DB::table('bookmarks')->where('user_id', $user->id)->where('is_bookmarked', true)->pluck('question_id');
@@ -130,6 +159,11 @@ class QuestionSelector
 
     private function pick(Collection $candidates, int $count, bool $keepOrder, ?int $seed): array
     {
+        return $this->payload($this->choose($candidates, $count, $keepOrder, $seed));
+    }
+
+    private function choose(Collection $candidates, int $count, bool $keepOrder, ?int $seed): Collection
+    {
         if (! $keepOrder) {
             // Shuffle whole passage groups (a lone question is its own group) so a passage never gets split up.
             $candidates = $candidates
@@ -138,12 +172,10 @@ class QuestionSelector
                 ->flatten(1);
         }
 
-        $chosen = $candidates->take(max(1, $count))->values();
-
-        return $this->payload($chosen);
+        return $candidates->take(max(1, $count))->values();
     }
 
-    private function payload(Collection $questions): array
+    private function payload(Collection $questions, bool $withKey = true): array
     {
         $passageIds = $questions->pluck('passage_id')->filter()->unique()->all();
         $passages = $passageIds
@@ -151,18 +183,25 @@ class QuestionSelector
             : [];
 
         return [
-            'questions' => $questions->map(fn (Question $q) => [
-                'id' => $q->id,
-                'html' => HtmlCleaner::clean($q->question),
-                'options' => array_map(fn ($o) => HtmlCleaner::clean((string) $o), $this->options($q)),
-                'answer' => strtoupper(trim((string) $q->answer)),
-                'marks' => (int) ($q->mark ?: 1),
-                'topic' => $q->topic?->name,
-                'year' => $q->paper?->year,
-                'passage_id' => $q->passage_id,
-                'explanation_en' => $q->explanation_en ? HtmlCleaner::clean($q->explanation_en) : null,
-                'explanation_pcm' => $q->explanation_pcm ? HtmlCleaner::clean($q->explanation_pcm) : null,
-            ])->all(),
+            'questions' => $questions->map(function (Question $q) use ($withKey) {
+                $item = [
+                    'id' => $q->id,
+                    'html' => HtmlCleaner::clean($q->question),
+                    'options' => array_map(fn ($o) => HtmlCleaner::clean((string) $o), $this->options($q)),
+                    'marks' => (int) ($q->mark ?: 1),
+                    'topic' => $q->topic?->name,
+                    'year' => $q->paper?->year,
+                    'passage_id' => $q->passage_id,
+                ];
+
+                if ($withKey) {
+                    $item['answer'] = strtoupper(trim((string) $q->answer));
+                    $item['explanation_en'] = $q->explanation_en ? HtmlCleaner::clean($q->explanation_en) : null;
+                    $item['explanation_pcm'] = $q->explanation_pcm ? HtmlCleaner::clean($q->explanation_pcm) : null;
+                }
+
+                return $item;
+            })->all(),
             'passages' => $passages,
         ];
     }

@@ -52,6 +52,15 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/session', [Student\PracticeController::class, 'session'])->name('session');
         Route::post('/attempts', [Student\PracticeController::class, 'attempts'])->middleware('throttle:120,1')->name('attempts');
     });
+    Route::prefix('mock')->name('mock.')->group(function () {
+        Route::get('/', [Student\MockController::class, 'index'])->name('index');
+        Route::post('/', [Student\MockController::class, 'start'])->middleware('throttle:20,1')->name('start');
+        Route::get('/{run}', [Student\MockController::class, 'show'])->name('show');
+        Route::post('/{run}/save', [Student\MockController::class, 'save'])->middleware('throttle:120,1')->name('save');
+        Route::post('/{run}/submit', [Student\MockController::class, 'submit'])->middleware('throttle:20,1')->name('submit');
+        Route::get('/{run}/result', [Student\MockController::class, 'result'])->name('result');
+        Route::get('/{run}/review', [Student\MockController::class, 'review'])->name('review');
+    });
     Route::get('/saved', [Student\SavedController::class, 'index'])->name('saved');
     Route::post('/saved/toggle', [Student\SavedController::class, 'toggle'])->middleware('throttle:120,1')->name('saved.toggle');
     Route::get('/progress', Student\ProgressController::class)->name('progress');
