@@ -11,11 +11,24 @@ class Question extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['test_id', 'question', 'answer', 'mark', 'options', 'not_question'];
+    protected $fillable = [
+        'test_id', 'paper_id', 'topic_id', 'question', 'answer',
+        'explanation_en', 'explanation_pcm', 'mark', 'options', 'not_question',
+    ];
 
     public function test()
     {
         return $this->belongsTo(Test::class);
+    }
+
+    public function paper()
+    {
+        return $this->belongsTo(Paper::class);
+    }
+
+    public function topic()
+    {
+        return $this->belongsTo(Topic::class);
     }
 
 

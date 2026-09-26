@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="{{ asset('css/components.css') }}">
     <!-- Custom style CSS -->
     <link rel="stylesheet" href="{{ asset('css/custom.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/testacbt-tokens.css') }}">
     <link rel='shortcut icon' type='image/x-icon' href="{{ asset('images/testa_logo_lg.png') }}" />
     <!-- Add this just before closing </body> tag for Toastr scripts -->
     <!-- Toastr CSS -->
@@ -63,6 +64,7 @@
                                             Login
                                         </button>
                                     </div>
+                                    <p class="text-center mb-0">New to TestaCBT? <a href="{{ route('register') }}">Create account</a></p>
                                 </form>
 
 

@@ -29,7 +29,45 @@ class User extends Authenticatable
         'login_attempts',
         'class_id',
         'gender',
+        'avatar_url',
+        'preferred_exams',
     ];
+
+    public const ROLE_ADMIN = 'admin';
+    public const ROLE_EXAMINER = 'examiner';
+    public const ROLE_STUDENT = 'student';
+
+    /**
+     * The legacy school screens still write user_type (1 super admin, 2 admin, 3 teacher, 4 student).
+     * Keep `role` in step with it so role middleware works until those screens are retired.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (User $user) {
+            if ($user->isDirty('user_type')) {
+                $user->role = match ((int) $user->user_type) {
+                    1, 2 => self::ROLE_ADMIN,
+                    3 => self::ROLE_EXAMINER,
+                    default => self::ROLE_STUDENT,
+                };
+            }
+        });
+    }
+
+    public function hasRole(string ...$roles): bool
+    {
+        return in_array($this->role, $roles, true);
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->role === self::ROLE_ADMIN;
+    }
+
+    public function canManageQuestions(): bool
+    {
+        return $this->hasRole(self::ROLE_ADMIN, self::ROLE_EXAMINER);
+    }
 
     /**
      * The attributes that should be hidden for serialization.
@@ -51,6 +89,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'preferred_exams' => 'array',
         ];
     }
 

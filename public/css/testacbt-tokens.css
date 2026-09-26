@@ -1,0 +1,52 @@
+/* TestaCBT design tokens (from the SabiPrep design). No gradients anywhere.
+   Defines variables only, so including this file does not restyle existing pages. */
+:root {
+  --page: #E9ECE8;
+  --bg: #F7F8F5;
+  --surface: #FFFFFF;
+  --surface-2: #EEF1EC;
+  --text: #13201A;
+  --muted: #5A6A61;
+  --border: #DCE2DB;
+  --primary: #0A7A4A;          /* exam-sheet green */
+  --on-primary: #FFFFFF;
+  --primary-soft: #DCEFE4;
+  --primary-ink: #086A40;
+  --accent: #E8A200;           /* HB-pencil yellow */
+  --accent-soft: #FCF0CF;
+  --accent-ink: #7A5400;
+  --danger: #C23A2E;
+  --danger-soft: #FAE3DF;
+  --blue-soft: #E2EAF8;  --blue-ink: #23508F;
+  --plum-soft: #F2E4EF;  --plum-ink: #7A2E6C;
+  --shadow: 0 1px 2px rgba(19, 32, 26, .06), 0 8px 24px rgba(19, 32, 26, .08);
+
+  --font-display: "Bricolage Grotesque", "Figtree", system-ui, sans-serif;
+  --font-body: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --page: #0A0E0C;  --bg: #0F1512;  --surface: #17201B;  --surface-2: #1F2A24;
+    --text: #E6EEE9;  --muted: #98A9A0;  --border: #2A3831;
+    --primary: #3DBE82;  --on-primary: #05140C;  --primary-soft: #163827;  --primary-ink: #74D8A8;
+    --accent: #F2B73A;  --accent-soft: #3A2D10;  --accent-ink: #F5CB70;
+    --danger: #EE7A6E;  --danger-soft: #3A1C19;
+    --blue-soft: #1A2842;  --blue-ink: #94B7F2;  --plum-soft: #35202F;  --plum-ink: #E3A6D6;
+    --shadow: 0 8px 24px rgba(0, 0, 0, .35);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --page: #0A0E0C;  --bg: #0F1512;  --surface: #17201B;  --surface-2: #1F2A24;
+  --text: #E6EEE9;  --muted: #98A9A0;  --border: #2A3831;
+  --primary: #3DBE82;  --on-primary: #05140C;  --primary-soft: #163827;  --primary-ink: #74D8A8;
+  --accent: #F2B73A;  --accent-soft: #3A2D10;  --accent-ink: #F5CB70;
+  --danger: #EE7A6E;  --danger-soft: #3A1C19;
+  --blue-soft: #1A2842;  --blue-ink: #94B7F2;  --plum-soft: #35202F;  --plum-ink: #E3A6D6;
+  --shadow: 0 8px 24px rgba(0, 0, 0, .35);
+  color-scheme: dark;
+}
