@@ -224,3 +224,13 @@ a.card:hover{border-color:var(--primary)}
   .qtext{font-size:18px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ---------- Question runner ---------- */
+.runner{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:24px;align-items:start}
+.runner aside{position:sticky;top:84px}
+.foot.fixed{position:fixed;left:0;right:0;bottom:0}
+.toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:10px 16px;border-radius:12px;font-weight:600;z-index:50;max-width:calc(100vw - 32px)}
+@media (max-width:860px){
+  .runner{grid-template-columns:1fr}
+  .runner aside{position:static}
+}

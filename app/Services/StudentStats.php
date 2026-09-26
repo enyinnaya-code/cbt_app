@@ -73,9 +73,9 @@ class StudentStats
             ->join('topics as t', 't.id', '=', 'q.topic_id')
             ->join('subjects as s', 's.id', '=', 't.subject_id')
             ->where('a.user_id', $this->user->id)
-            ->groupBy('t.id', 't.name', 's.id', 's.name')
+            ->groupBy('t.id', 't.name', 's.id', 's.name', 's.slug')
             ->havingRaw('COUNT(*) >= ?', [$min])
-            ->select('t.id as topic_id', 't.name as topic', 's.id as subject_id', 's.name as subject', DB::raw('COUNT(*) as answered'), DB::raw('SUM(a.is_correct) as correct'))
+            ->select('t.id as topic_id', 't.name as topic', 's.id as subject_id', 's.name as subject', 's.slug as subject_slug', DB::raw('COUNT(*) as answered'), DB::raw('SUM(a.is_correct) as correct'))
             ->get()
             ->map(function ($r) {
                 $r->accuracy = (int) round($r->correct / $r->answered * 100);

@@ -7,6 +7,7 @@ use App\Models\Exam;
 use App\Models\Paper;
 use App\Models\Question;
 use App\Models\Subject;
+use App\Support\HtmlCleaner;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
@@ -155,13 +156,10 @@ class PackBuilder
         ];
     }
 
-    /** Strip anything executable, then embed locally uploaded images so the pack works with no network. */
+    /** Sanitise the HTML, then embed locally uploaded images so the pack works with no network. */
     private function clean(string $html): string
     {
-        $html = preg_replace('#<(script|style|iframe|object|embed)\b[^>]*>.*?</\1>#is', '', $html);
-        $html = preg_replace('#<(script|style|iframe|object|embed)\b[^>]*/?>#i', '', $html);
-        $html = preg_replace('/\son[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $html);
-        $html = preg_replace('/(href|src)\s*=\s*(["\'])\s*javascript:[^"\']*\2/i', '', $html);
+        $html = HtmlCleaner::clean($html);
 
         return preg_replace_callback('/(<img\b[^>]*?\bsrc\s*=\s*)(["\'])(.*?)\2/i', function ($m) {
             $url = html_entity_decode($m[3]);

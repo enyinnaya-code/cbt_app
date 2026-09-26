@@ -13,6 +13,7 @@ use App\Http\Controllers\StudentController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\SummernoteController;
+use App\Http\Controllers\Student;
 
 
 
@@ -44,6 +45,20 @@ Route::middleware(['auth'])->group(function () {
     })->name('calendar');
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    // Student area
+    Route::prefix('practice')->name('practice.')->group(function () {
+        Route::get('/', [Student\PracticeController::class, 'index'])->name('index');
+        Route::get('/session', [Student\PracticeController::class, 'session'])->name('session');
+        Route::post('/attempts', [Student\PracticeController::class, 'attempts'])->middleware('throttle:120,1')->name('attempts');
+    });
+    Route::get('/saved', [Student\SavedController::class, 'index'])->name('saved');
+    Route::post('/saved/toggle', [Student\SavedController::class, 'toggle'])->middleware('throttle:120,1')->name('saved.toggle');
+    Route::get('/progress', Student\ProgressController::class)->name('progress');
+    Route::get('/profile', [Student\ProfileController::class, 'edit'])->name('profile');
+    Route::put('/profile', [Student\ProfileController::class, 'update'])->name('profile.update');
+    Route::put('/profile/password', [Student\ProfileController::class, 'password'])->name('profile.password');
+
     Route::middleware('role:admin')->group(function () {
         Route::get('/add-section', [SectionController::class, 'create'])->name('section.create');
         Route::get('/manage-sections', [SectionController::class, 'index'])->name('section.index');

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Models\Question;
+use App\Services\ProgressRecorder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -46,77 +46,22 @@ class SyncController extends Controller
             'mock_sessions.*.taken_at' => ['required', 'date'],
         ]);
 
-        $user = $request->user();
+        $recorder = new ProgressRecorder($request->user());
         $now = now();
-        $result = ['attempts' => 0, 'bookmarks' => 0, 'mock_sessions' => 0];
-        $rejected = ['attempts' => 0, 'bookmarks' => 0];
 
-        // The answer key decides correctness. The phone's claim is never trusted.
-        $questionIds = collect($data['attempts'] ?? [])->pluck('question_id')
-            ->merge(collect($data['bookmarks'] ?? [])->pluck('question_id'))->unique()->values();
-        $questions = Question::whereIn('id', $questionIds)->get(['id', 'answer', 'not_question'])->keyBy('id');
-
-        DB::transaction(function () use ($data, $user, $now, $questions, &$result, &$rejected) {
-            $rows = [];
-            foreach ($data['attempts'] ?? [] as $a) {
-                $q = $questions->get($a['question_id']);
-                if (! $q || (int) $q->not_question === 1) { $rejected['attempts']++; continue; }
-
-                $selected = isset($a['selected']) ? strtoupper($a['selected']) : null;
-                $rows[] = [
-                    'user_id' => $user->id,
-                    'client_uuid' => $a['client_uuid'],
-                    'question_id' => $q->id,
-                    'mode' => $a['mode'],
-                    'selected' => $selected,
-                    'is_correct' => $selected !== null && $selected === strtoupper(trim((string) $q->answer)),
-                    'time_ms' => $a['time_ms'] ?? null,
-                    'answered_at' => $this->clampToNow($a['answered_at'], $now),
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ];
-            }
-            foreach (array_chunk($rows, 200) as $chunk) {
-                $result['attempts'] += DB::table('question_attempts')->insertOrIgnore($chunk);
-            }
-
-            // Bookmarks: newest change wins, judged by the phone's own timestamps.
-            $incoming = collect($data['bookmarks'] ?? [])->filter(fn ($b) => $questions->has($b['question_id']));
-            $rejected['bookmarks'] = count($data['bookmarks'] ?? []) - $incoming->count();
-
-            $existing = DB::table('bookmarks')->where('user_id', $user->id)
-                ->whereIn('question_id', $incoming->pluck('question_id'))->pluck('changed_at', 'question_id');
-
-            $upserts = [];
-            foreach ($incoming->sortBy('changed_at')->keyBy('question_id') as $qid => $b) {
-                $changedAt = $this->clampToNow($b['changed_at'], $now);
-                if (isset($existing[$qid]) && Carbon::parse($existing[$qid])->gte(Carbon::parse($changedAt))) { continue; }
-
-                $upserts[] = [
-                    'user_id' => $user->id, 'question_id' => $qid, 'is_bookmarked' => (bool) $b['bookmarked'],
-                    'changed_at' => $changedAt, 'created_at' => $now, 'updated_at' => $now,
-                ];
-            }
-            if ($upserts) {
-                DB::table('bookmarks')->upsert($upserts, ['user_id', 'question_id'], ['is_bookmarked', 'changed_at', 'updated_at']);
-            }
-            $result['bookmarks'] = count($upserts);
-
-            $mocks = [];
-            foreach ($data['mock_sessions'] ?? [] as $m) {
-                $mocks[] = [
-                    'user_id' => $user->id, 'client_uuid' => $m['client_uuid'], 'exam_id' => $m['exam_id'],
-                    'subject_scores' => json_encode($m['subject_scores']), 'score' => $m['score'], 'total' => $m['total'],
-                    'duration_seconds' => $m['duration_seconds'], 'taken_at' => $this->clampToNow($m['taken_at'], $now),
-                    'created_at' => $now, 'updated_at' => $now,
-                ];
-            }
-            if ($mocks) {
-                $result['mock_sessions'] = DB::table('mock_sessions')->insertOrIgnore($mocks);
-            }
+        $result = DB::transaction(function () use ($recorder, $data, $now) {
+            return [
+                'attempts' => $recorder->attempts($data['attempts'] ?? [], $now),
+                'bookmarks' => $recorder->bookmarks($data['bookmarks'] ?? [], $now),
+                'mock_sessions' => $recorder->mockSessions($data['mock_sessions'] ?? [], $now),
+            ];
         });
 
-        return response()->json(['accepted' => $result, 'rejected' => $rejected, 'server_time' => $now->toIso8601String()]);
+        return response()->json([
+            'accepted' => ['attempts' => $result['attempts']['accepted'], 'bookmarks' => $result['bookmarks']['accepted'], 'mock_sessions' => $result['mock_sessions']],
+            'rejected' => ['attempts' => $result['attempts']['rejected'], 'bookmarks' => $result['bookmarks']['rejected']],
+            'server_time' => $now->toIso8601String(),
+        ]);
     }
 
     /**
@@ -169,17 +114,6 @@ class SyncController extends Controller
             'mock_sessions' => $mocks->values(),
             'server_time' => $now->toIso8601String(),
         ]);
-    }
-
-    /**
-     * A phone with a wrong clock must not be able to write records dated in the future.
-     * Phones send UTC; convert to the app timezone so stored values match created_at and compare correctly.
-     */
-    private function clampToNow(string $value, Carbon $now): Carbon
-    {
-        $t = Carbon::parse($value)->setTimezone(config('app.timezone'));
-
-        return $t->greaterThan($now->copy()->addDay()) ? $now->copy() : $t;
     }
 
     /** Stored times have no offset; hand the app full ISO-8601 so it never has to guess the timezone. */

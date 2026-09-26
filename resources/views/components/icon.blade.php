@@ -42,4 +42,4 @@
         'shield' => 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z',
     ];
 @endphp
-<svg class="ic {{ $size }}" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ $paths[$name] ?? '' }}"/></svg>
+<svg {{ $attributes->merge(['class' => trim('ic ' . $size)]) }} viewBox="0 0 24 24" aria-hidden="true"><path d="{{ $paths[$name] ?? '' }}"/></svg>
