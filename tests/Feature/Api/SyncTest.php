@@ -171,6 +171,11 @@ class SyncTest extends TestCase
         $this->assertSame($q->id, $r->json('bookmarks.0.question_id'));
         $this->assertTrue($r->json('bookmarks.0.bookmarked'));
 
+        // Where each record came from, so a new phone can show progress before downloading any pack.
+        $this->assertSame([$this->exam->id, $this->subject->id, 2019], [$r->json('attempts.0.exam_id'), $r->json('attempts.0.subject_id'), $r->json('attempts.0.year')]);
+        $this->assertNull($r->json('attempts.0.topic_id'));
+        $this->assertSame([$this->exam->id, $this->subject->id], [$r->json('bookmarks.0.exam_id'), $r->json('bookmarks.0.subject_id')]);
+
         // Within one test Laravel keeps the first request's user cached; a real second request starts fresh.
         \Illuminate\Support\Facades\Auth::forgetGuards();
 

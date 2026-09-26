@@ -21,12 +21,14 @@ class CatalogController extends Controller
 
         $exams = Exam::where('is_active', true)->orderBy('sort_order')->with(['subjects' => fn ($q) => $q->where('subjects.is_active', true)->orderBy('subjects.name')])->get()
             ->map(fn (Exam $exam) => [
+                'id' => $exam->id,
                 'slug' => $exam->slug,
                 'name' => $exam->name,
                 'subjects' => $exam->subjects->map(function ($subject) use ($exam, $packs) {
                     $pack = $packs->get($exam->id . '-' . $subject->id);
 
                     return [
+                        'id' => $subject->id,
                         'slug' => $subject->slug,
                         'name' => $subject->name,
                         'display_name' => $subject->pivot->display_name ?: $subject->name,
@@ -45,7 +47,20 @@ class CatalogController extends Controller
                 })->values(),
             ])->values();
 
-        $body = ['exams' => $exams];
+        // Mock exam formats travel with the catalog so the app follows the server's settings when they change.
+        $body = [
+            'exams' => $exams,
+            'mock' => collect(config('testacbt.mock'))->map(fn ($f) => [
+                'label' => $f['label'],
+                'subject_count' => $f['subject_count'],
+                'compulsory' => $f['compulsory'] ?? null,
+                'questions' => $f['questions'],
+                'minutes' => $f['minutes'],
+                'score_max' => $f['score_max'],
+            ])->all(),
+            'practice_counts' => config('testacbt.practice_counts'),
+            'strong_accuracy' => config('testacbt.strong_accuracy'),
+        ];
         $etag = '"' . md5(json_encode($body)) . '"';
 
         if ($request->header('If-None-Match') === $etag) {

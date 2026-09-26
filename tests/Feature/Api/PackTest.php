@@ -187,6 +187,14 @@ class PackTest extends TestCase
         $this->assertSame($pack->size_bytes, $subjects['english-language']['pack']['size_bytes']);
         $this->assertSame($pack->sha256, $subjects['english-language']['pack']['sha256']);
         $this->assertNull($subjects['chemistry']['pack'], 'subjects with no published papers have no pack');
+
+        // The app needs ids to sync mock results, and the mock formats so it follows the server's settings.
+        $this->assertSame($exam->id, $r->json('exams.0.id'));
+        $this->assertSame($subject->id, $subjects['english-language']['id']);
+        $this->assertSame(120, $r->json('mock.jamb.minutes'));
+        $this->assertSame(60, $r->json('mock.jamb.questions.english-language'));
+        $this->assertSame('english-language', $r->json('mock.jamb.compulsory'));
+        $this->assertSame([10, 20, 40, 50], array_slice($r->json('practice_counts'), 0, 4));
     }
 
     public function test_catalog_supports_etag_so_unchanged_checks_cost_almost_nothing(): void

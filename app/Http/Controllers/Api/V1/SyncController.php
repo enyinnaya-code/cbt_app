@@ -80,9 +80,15 @@ class SyncController extends Controller
         $since = isset($v['since']) ? Carbon::parse($v['since'])->setTimezone(config('app.timezone')) : null;
         $now = now();
 
-        $attempts = DB::table('question_attempts')->where('user_id', $user->id)->where('id', '>', $cursor)
-            ->orderBy('id')->limit(self::PAGE + 1)
-            ->get(['id', 'client_uuid', 'question_id', 'mode', 'selected', 'is_correct', 'time_ms', 'answered_at']);
+        // exam_id, subject_id, year and topic_id say where each answer came from, so a new phone can build its
+        // progress screens before it has downloaded any packs.
+        $attempts = DB::table('question_attempts as a')
+            ->leftJoin('questions as q', 'q.id', '=', 'a.question_id')
+            ->leftJoin('papers as p', 'p.id', '=', 'q.paper_id')
+            ->where('a.user_id', $user->id)->where('a.id', '>', $cursor)
+            ->orderBy('a.id')->limit(self::PAGE + 1)
+            ->get(['a.id', 'a.client_uuid', 'a.question_id', 'a.mode', 'a.selected', 'a.is_correct', 'a.time_ms', 'a.answered_at',
+                'p.exam_id', 'p.subject_id', 'p.year', 'q.topic_id']);
 
         $hasMore = $attempts->count() > self::PAGE;
         $attempts = $attempts->take(self::PAGE)->map(fn ($a) => (object) array_merge((array) $a, [
@@ -90,9 +96,12 @@ class SyncController extends Controller
             'answered_at' => $this->iso($a->answered_at),
         ]));
 
-        $bookmarks = DB::table('bookmarks')->where('user_id', $user->id)
-            ->when($since, fn ($q) => $q->where('changed_at', '>', $since))
-            ->get(['question_id', 'is_bookmarked as bookmarked', 'changed_at'])
+        $bookmarks = DB::table('bookmarks as b')
+            ->leftJoin('questions as q', 'q.id', '=', 'b.question_id')
+            ->leftJoin('papers as p', 'p.id', '=', 'q.paper_id')
+            ->where('b.user_id', $user->id)
+            ->when($since, fn ($w) => $w->where('b.changed_at', '>', $since))
+            ->get(['b.question_id', 'b.is_bookmarked as bookmarked', 'b.changed_at', 'p.exam_id', 'p.subject_id'])
             ->map(fn ($b) => (object) array_merge((array) $b, [
                 'bookmarked' => (bool) $b->bookmarked,
                 'changed_at' => $this->iso($b->changed_at),
