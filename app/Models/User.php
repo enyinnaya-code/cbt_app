@@ -32,6 +32,9 @@ class User extends Authenticatable
         'gender',
         'avatar_url',
         'preferred_exams',
+        'explanation_language',
+        'target_exam',
+        'target_exam_date',
     ];
 
     public const ROLE_ADMIN = 'admin';
@@ -91,6 +94,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'preferred_exams' => 'array',
+            'target_exam_date' => 'date',
         ];
     }
 

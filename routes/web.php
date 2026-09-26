@@ -19,9 +19,10 @@ use App\Http\Controllers\SummernoteController;
 
 
 
-Route::get('/', function () {
-    return view('index');
-})->name('login');
+Route::middleware('guest')->group(function () {
+    Route::view('/', 'welcome')->name('welcome');
+    Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
+});
 
 // Login routes
 Route::post('/login', [LoginController::class, 'login'])->name('login.submit');

@@ -1,0 +1,85 @@
+@extends('layouts.base')
+
+@php
+    $user = auth()->user();
+    $isStaff = $user->canManageQuestions();
+    $initials = collect(preg_split('/\s+/', trim($user->name)))->filter()->take(2)->map(fn ($p) => mb_strtoupper(mb_substr($p, 0, 1)))->implode('');
+
+    // [label, route name, icon, active pattern]
+    $nav = $isStaff
+        ? [
+            ['Overview', 'dashboard', 'grid', 'dashboard'],
+            ['Papers', 'console.papers.index', 'layers', 'console.papers.*'],
+            ['Topics', 'console.topics.index', 'book', 'console.topics.*'],
+            ['Packs', 'console.packs.index', 'download', 'console.packs.*'],
+            ...($user->isAdmin() ? [['Users', 'console.users.index', 'users', 'console.users.*']] : []),
+        ]
+        : [
+            ['Home', 'dashboard', 'home', 'dashboard'],
+            ['Practice', 'practice.index', 'book', 'practice.*'],
+            ['Mock', 'mock.index', 'clock', 'mock.*'],
+            ['Progress', 'progress', 'chart', 'progress'],
+            ['Saved', 'saved', 'bookmark', 'saved'],
+        ];
+    $mobileNav = $isStaff ? $nav : [
+        ['Home', 'dashboard', 'home', 'dashboard'],
+        ['Practice', 'practice.index', 'book', 'practice.*'],
+        ['Mock', 'mock.index', 'clock', 'mock.*'],
+        ['Progress', 'progress', 'chart', 'progress'],
+        ['Profile', 'profile', 'user', 'profile'],
+    ];
+@endphp
+
+@section('body')
+<header class="topbar">
+    <div class="topbar-in">
+        <a class="brand" href="{{ route('dashboard') }}">
+            <span class="brand-mark"><x-icon name="check" size="s"/></span>TestaCBT
+        </a>
+        <nav class="topnav" aria-label="Main">
+            @foreach($nav as [$label, $routeName, $icon, $pattern])
+                @if(Route::has($routeName))
+                    <a href="{{ route($routeName) }}" class="{{ request()->routeIs($pattern) ? 'on' : '' }}">{{ $label }}</a>
+                @endif
+            @endforeach
+        </nav>
+        <div class="topbar-r">
+            @if($isStaff)<span class="badge n">{{ ucfirst($user->role) }}</span>@endif
+            <div class="usermenu">
+                <button type="button" class="avatar sm" data-menu-toggle aria-label="Account menu" style="border:0;cursor:pointer">
+                    @if($user->avatar_url)<img src="{{ $user->avatar_url }}" alt="">@else{{ $initials }}@endif
+                </button>
+                <div class="usermenu-panel">
+                    <div class="who"><p class="h3">{{ $user->name }}</p><p class="small muted">{{ $user->email }}</p></div>
+                    @if(Route::has('profile'))
+                        <a href="{{ route('profile') }}"><x-icon name="user" size="s"/>Profile and settings</a>
+                    @endif
+                    <div class="seg" data-theme-group style="margin:6px 0">
+                        <button type="button" data-theme-val="light"><x-icon name="sun" size="s"/>&nbsp;Light</button>
+                        <button type="button" data-theme-val="dark"><x-icon name="moon" size="s"/>&nbsp;Dark</button>
+                    </div>
+                    <form method="POST" action="{{ route('logout') }}">@csrf
+                        <button type="submit"><x-icon name="logout" size="s"/>Sign out</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+<main class="page @yield('page_class')">
+    @if(session('success'))<div class="alert ok" role="status">{{ session('success') }}</div>@endif
+    @if(session('error'))<div class="alert err" role="alert">{{ session('error') }}</div>@endif
+    @yield('content')
+</main>
+
+<nav class="bottom-nav" aria-label="Main">
+    @foreach($mobileNav as [$label, $routeName, $icon, $pattern])
+        @if(Route::has($routeName))
+            <a href="{{ route($routeName) }}" class="{{ request()->routeIs($pattern) ? 'on' : '' }}">
+                <span class="pill"><x-icon name="{{ $icon }}"/></span>{{ $label }}
+            </a>
+        @endif
+    @endforeach
+</nav>
+@endsection

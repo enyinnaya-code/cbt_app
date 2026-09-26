@@ -18,8 +18,13 @@ class DashboardController extends Controller
     //
 
 
-    public function index()
+    public function index(\Illuminate\Http\Request $request)
     {
+        // Students get the new Home. Staff keep the old dashboard until the console replaces it.
+        if ($request->user()->role === User::ROLE_STUDENT) {
+            return app(Student\HomeController::class)->index($request);
+        }
+
         $totalTests = Test::count();
         $submittedTests = Test::where('is_submitted', 1)->count();
         $approvedTests = Test::where('is_approved', 1)->count();

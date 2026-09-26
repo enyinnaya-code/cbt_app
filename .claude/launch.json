@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "testacbt-scratch",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set APP_ENV=clone&& cd public && php -S 127.0.0.1:8099 ..\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\resources\\server.php"
+      ],
+      "port": 8099
+    }
+  ]
+}

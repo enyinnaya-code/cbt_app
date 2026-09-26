@@ -14,7 +14,7 @@ class LoginController extends Controller
     // Show the login form
     public function showLoginForm()
     {
-        return view('index');
+        return view('auth.login');
     }
 
     public function login(Request $request)
@@ -60,6 +60,6 @@ class LoginController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('login');
+        return redirect()->route('welcome');
     }
 }
