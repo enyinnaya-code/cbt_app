@@ -14,7 +14,7 @@ use Illuminate\Http\Request;
 class SettingsController extends Controller
 {
     /** Where an uploaded Android app is kept, inside the public folder so the web server can send it directly. */
-    public const APK_PATH = 'downloads/TestaCBT.apk';
+    public const APK_PATH = \App\Http\Controllers\Site\HomeController::UPLOAD_PATH;
 
     /** Setting key => validation rule. Only these keys can be saved from the form. */
     private const FIELDS = [
@@ -44,7 +44,7 @@ class SettingsController extends Controller
         return view('console.settings', [
             'values' => collect(array_keys(self::FIELDS))->mapWithKeys(fn ($key) => [$key => Setting::get($key, '')])->all(),
             'paystack' => \App\Services\Payments\Paystack::configured(),
-            'apk' => \App\Http\Controllers\Site\HomeController::uploadedApk(),
+            'apk' => \App\Http\Controllers\Site\HomeController::apkFiles(),
             'uploadLimit' => self::uploadLimitBytes(),
         ]);
     }
@@ -93,7 +93,7 @@ class SettingsController extends Controller
 
         if ($request->boolean('remove_apk') && ! $request->hasFile('apk_file')) {
             if (is_file($target)) { @unlink($target); }
-            Setting::put(['app.apk_file' => null, 'app.apk_size' => null, 'app.apk_updated_at' => null]);
+            Setting::put(['app.apk_size' => null, 'app.apk_updated_at' => null]);
             return;
         }
 
@@ -115,7 +115,7 @@ class SettingsController extends Controller
             throw \Illuminate\Validation\ValidationException::withMessages(['apk_file' => 'The file could not be saved because public/downloads is not writable by the server. Ask whoever runs the server to fix its permissions.']);
         }
 
-        Setting::put(['app.apk_file' => '/' . self::APK_PATH, 'app.apk_size' => filesize($target), 'app.apk_updated_at' => now()->toIso8601String()]);
+        Setting::put(['app.apk_size' => filesize($target), 'app.apk_updated_at' => now()->toIso8601String()]);
     }
 
     /** The biggest file this server will accept in one upload: the smaller of upload_max_filesize and post_max_size. */

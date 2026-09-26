@@ -18,9 +18,10 @@
         <div class="field"><label for="app_play_store_url">Google Play link</label><input id="app_play_store_url" name="app_play_store_url" type="url" class="input" value="{{ old('app_play_store_url', $values['app.play_store_url']) }}" placeholder="https://play.google.com/store/apps/details?id=com.testacbt.app"></div>
         <div class="field"><label for="app_app_store_url">App Store link</label><input id="app_app_store_url" name="app_app_store_url" type="url" class="input" value="{{ old('app_app_store_url', $values['app.app_store_url']) }}" placeholder="https://apps.apple.com/app/..."></div>
         <div class="field"><label for="apk_file">Android app file (.apk)</label>
-            @if($apk)
-                <div class="alert ok" style="font-weight:500">Live on the website: <b>{{ \App\Http\Controllers\Console\SettingsController::formatBytes($apk['size']) }}</b>@if($apk['updated_at']), uploaded {{ \Illuminate\Support\Carbon::parse($apk['updated_at'])->format('j F Y g:i a') }}@endif. <a class="link" href="{{ $apk['url'] }}">Download it to check</a>.
-                    <label class="row small" style="gap:8px;margin-top:6px"><input type="checkbox" name="remove_apk" value="1"> Remove it from the website</label></div>
+            @if($apk['chosen'])
+                <div class="alert ok" style="font-weight:500">Offered on the website now: <b>{{ $apk['chosen'] === $apk['upload'] ? 'the file uploaded here' : 'the release build that came with the code' }}</b>, {{ \App\Http\Controllers\Console\SettingsController::formatBytes($apk['chosen']['size']) }}@if($apk['chosen']['version']), version {{ $apk['chosen']['version'] }}@endif. <a class="link" href="{{ $apk['chosen']['url'] }}">Download it to check</a>.
+                    <span style="display:block;font-weight:500;margin-top:4px" class="small">The newest file wins: a new release pulled from GitHub replaces an older upload, and a newer upload replaces the release.</span>
+                    @if($apk['upload'])<label class="row small" style="gap:8px;margin-top:6px"><input type="checkbox" name="remove_apk" value="1"> Remove the file uploaded here</label>@endif</div>
             @endif
             <input id="apk_file" name="apk_file" type="file" class="input" accept=".apk,application/vnd.android.package-archive" style="padding:10px 14px">
             <span class="hint">Choosing a file replaces the current one. Up to 300 MB. This server accepts uploads up to <b>{{ \App\Http\Controllers\Console\SettingsController::formatBytes($uploadLimit) }}</b>{{ $uploadLimit > 0 && $uploadLimit < 100 * 1048576 ? ', so a bigger app needs the server limit raised (or use the link box below)' : '' }}.</span></div>

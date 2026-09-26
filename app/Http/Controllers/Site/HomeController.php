@@ -51,31 +51,56 @@ class HomeController extends Controller
     }
 
     /**
-     * Where each phone can get the app. The Android app can come from Google Play, from a file uploaded here, or from
-     * a link to a file hosted elsewhere; the page falls back to "use it in your browser" when there is nothing.
+     * Where each phone can get the app. The Android app can come from Google Play, from an app file (one uploaded in the
+     * console, or the release build that ships with the code), or from a link to a file hosted elsewhere. The page falls
+     * back to "use it in your browser" when there is nothing.
      *
      * @return array{android:?string,ios:?string,apk:?string,apk_version:?string,apk_size:int}
      */
     public static function stores(): array
     {
-        $uploaded = self::uploadedApk();
+        $apk = self::apkFiles()['chosen'];
 
         return [
             'android' => Setting::get('app.play_store_url'),
             'ios' => Setting::get('app.app_store_url'),
-            'apk' => $uploaded['url'] ?? Setting::get('app.apk_url'),
-            'apk_version' => Setting::get('app.apk_version'),
-            'apk_size' => $uploaded['size'] ?? 0,
+            'apk' => $apk['url'] ?? Setting::get('app.apk_url'),
+            'apk_version' => $apk ? $apk['version'] : Setting::get('app.apk_version'),
+            'apk_size' => $apk['size'] ?? 0,
         ];
     }
 
-    /** The app file an admin uploaded, if it is still on the server. */
-    public static function uploadedApk(): ?array
+    /** Where an app file uploaded in the console is kept (kept out of git, so pulling new code never clashes with it). */
+    public const UPLOAD_PATH = 'downloads/TestaCBT-upload.apk';
+
+    /** The release build that is committed with the code (see mobile/scripts/build-apk.mjs), with its details in a small .json next to it. */
+    public const RELEASE_PATH = 'downloads/TestaCBT.apk';
+
+    /**
+     * The app files on this server, and which one visitors get: the newest, so a fresh release pulled from git replaces an
+     * older upload, and a newer upload replaces an older release.
+     *
+     * @return array{upload:?array,release:?array,chosen:?array}
+     */
+    public static function apkFiles(): array
     {
-        $path = Setting::get('app.apk_file');
+        $describe = function (string $relative, ?string $version, ?string $fallbackDate): ?array {
+            $file = public_path($relative);
+            if (! is_file($file)) { return null; }
 
-        if (! $path || ! is_file(public_path(ltrim($path, '/')))) { return null; }
+            return [
+                'url' => url('/' . $relative), 'size' => (int) filesize($file), 'modified' => (int) filemtime($file),
+                'version' => $version, 'updated_at' => $fallbackDate,
+            ];
+        };
 
-        return ['url' => url($path), 'size' => (int) filesize(public_path(ltrim($path, '/'))), 'updated_at' => Setting::get('app.apk_updated_at')];
+        $meta = is_file(public_path('downloads/TestaCBT.json')) ? (json_decode((string) file_get_contents(public_path('downloads/TestaCBT.json')), true) ?: []) : [];
+
+        $upload = $describe(self::UPLOAD_PATH, Setting::get('app.apk_version'), Setting::get('app.apk_updated_at'));
+        $release = $describe(self::RELEASE_PATH, $meta['version'] ?? null, $meta['built_at'] ?? null);
+
+        $chosen = collect([$upload, $release])->filter()->sortByDesc('modified')->first();
+
+        return ['upload' => $upload, 'release' => $release, 'chosen' => $chosen];
     }
 }

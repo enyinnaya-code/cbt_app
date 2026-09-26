@@ -101,6 +101,31 @@ class SiteContentTest extends TestCase
             ->assertDontSee('Use it on your phone');
     }
 
+    /** Points the public folder at an empty temporary one, so tests never touch the real release build in public/downloads. */
+    private function tempPublic(): string
+    {
+        $dir = sys_get_temp_dir() . '/tc-public-' . uniqid();
+        mkdir($dir . '/downloads', 0777, true);
+        $this->app->usePublicPath($dir);
+        $this->tempPublicDirs[] = $dir;
+
+        return $dir;
+    }
+
+    /** @var array<int,string> */
+    private array $tempPublicDirs = [];
+
+    protected function tearDown(): void
+    {
+        foreach ($this->tempPublicDirs as $dir) {
+            foreach (glob($dir . '/downloads/*') ?: [] as $file) { @unlink($file); }
+            @rmdir($dir . '/downloads');
+            @rmdir($dir);
+        }
+
+        parent::tearDown();
+    }
+
     private function fakeApk(string $content = "PK\x03\x04 pretend apk contents"): \Illuminate\Http\UploadedFile
     {
         return \Illuminate\Http\UploadedFile::fake()->createWithContent('testacbt-release.apk', $content);
@@ -111,70 +136,94 @@ class SiteContentTest extends TestCase
         return $over + ['app_play_store_url' => '', 'app_app_store_url' => '', 'app_apk_url' => '', 'app_apk_version' => '', 'support_email' => '', 'support_whatsapp' => ''];
     }
 
-    public function test_an_admin_uploads_the_android_app_and_it_is_offered_on_the_website(): void
+    /** Puts the release build that ships with the code (and its details) in the temporary public folder. */
+    private function releaseBuild(string $version = '2.0.0', ?int $modified = null): string
     {
-        $admin = $this->makeUser(2);
-        $file = public_path('downloads/TestaCBT.apk');
+        $dir = $this->tempPublic();
+        file_put_contents($dir . '/downloads/TestaCBT.apk', "PK\x03\x04 release build");
+        file_put_contents($dir . '/downloads/TestaCBT.json', json_encode(['version' => $version, 'built_at' => '2026-09-27T10:00:00+01:00']));
+        if ($modified) { touch($dir . '/downloads/TestaCBT.apk', $modified); }
 
-        try {
-            $this->actingAs($admin)->put('/console/settings', $this->settingsForm(['apk_file' => $this->fakeApk(), 'app_apk_version' => '1.0.3']))->assertSessionHasNoErrors();
-
-            $this->assertFileExists($file);
-            $this->assertSame('/downloads/TestaCBT.apk', Setting::get('app.apk_file'));
-
-            $this->get('/')->assertOk()
-                ->assertSee(url('/downloads/TestaCBT.apk'), false)->assertSee('Download the app (APK)')->assertSee('Version 1.0.3')
-                ->assertDontSee('Coming soon');
-            $this->actingAs($admin)->get('/console/settings')->assertOk()->assertSee('Live on the website');
-        } finally {
-            @unlink($file);
-        }
+        return $dir;
     }
 
-    public function test_an_uploaded_app_is_removed_when_the_admin_asks(): void
+    public function test_the_release_build_that_ships_with_the_code_is_offered_with_its_version(): void
     {
+        $this->releaseBuild('1.4.2');
+
+        $this->get('/')->assertOk()
+            ->assertSee(url('/downloads/TestaCBT.apk'), false)->assertSee('Download the app (APK)')->assertSee('Version 1.4.2')
+            ->assertDontSee('Use it on your phone');
+    }
+
+    public function test_an_admin_uploads_the_android_app_and_it_is_offered_on_the_website(): void
+    {
+        $dir = $this->tempPublic();
         $admin = $this->makeUser(2);
-        $file = public_path('downloads/TestaCBT.apk');
 
-        try {
-            $this->actingAs($admin)->put('/console/settings', $this->settingsForm(['apk_file' => $this->fakeApk()]));
-            $this->assertFileExists($file);
+        $this->actingAs($admin)->put('/console/settings', $this->settingsForm(['apk_file' => $this->fakeApk(), 'app_apk_version' => '1.0.3']))->assertSessionHasNoErrors();
 
-            $this->actingAs($admin)->put('/console/settings', $this->settingsForm(['remove_apk' => 1]))->assertSessionHasNoErrors();
+        $this->assertFileExists($dir . '/downloads/TestaCBT-upload.apk');
+        $this->get('/')->assertOk()
+            ->assertSee(url('/downloads/TestaCBT-upload.apk'), false)->assertSee('Download the app (APK)')->assertSee('Version 1.0.3')
+            ->assertDontSee('Coming soon');
+        $this->actingAs($admin)->get('/console/settings')->assertOk()->assertSee('Offered on the website now')->assertSee('the file uploaded here');
+    }
 
-            $this->assertFileDoesNotExist($file);
-            $this->assertNull(Setting::get('app.apk_file'));
-            $this->get('/')->assertSee('Use it on your phone');
-        } finally {
-            @unlink($file);
-        }
+    public function test_the_newest_app_file_is_the_one_offered(): void
+    {
+        $dir = $this->releaseBuild('2.0.0', time() - 3600);
+        file_put_contents($dir . '/downloads/TestaCBT-upload.apk', "PK\x03\x04 uploaded");
+        \App\Models\Setting::put(['app.apk_version' => '1.9.0']);
+
+        // A fresh upload is newer than the release, so it wins.
+        $this->get('/')->assertSee('/downloads/TestaCBT-upload.apk', false)->assertSee('Version 1.9.0');
+
+        // Then a new release is pulled from GitHub: it is newer, so it wins.
+        touch($dir . '/downloads/TestaCBT.apk', time() + 60);
+        $this->get('/')->assertSee('/downloads/TestaCBT.apk', false)->assertDontSee('TestaCBT-upload.apk', false)->assertSee('Version 2.0.0');
+    }
+
+    public function test_removing_the_upload_falls_back_to_the_release_build(): void
+    {
+        $dir = $this->releaseBuild('2.0.0', time() - 3600);
+        $admin = $this->makeUser(2);
+        $this->actingAs($admin)->put('/console/settings', $this->settingsForm(['apk_file' => $this->fakeApk()]));
+        $this->assertFileExists($dir . '/downloads/TestaCBT-upload.apk');
+
+        $this->actingAs($admin)->put('/console/settings', $this->settingsForm(['remove_apk' => 1]))->assertSessionHasNoErrors();
+
+        $this->assertFileDoesNotExist($dir . '/downloads/TestaCBT-upload.apk');
+        $this->assertFileExists($dir . '/downloads/TestaCBT.apk', 'the release build is never removed from here');
+        $this->get('/')->assertSee('/downloads/TestaCBT.apk', false);
     }
 
     public function test_a_file_that_is_not_an_android_app_is_refused(): void
     {
+        $dir = $this->tempPublic();
         $admin = $this->makeUser(2);
 
         $this->actingAs($admin)->put('/console/settings', $this->settingsForm(['apk_file' => $this->fakeApk('<?php echo "hello";')]))->assertSessionHasErrors('apk_file');
         $this->actingAs($admin)->put('/console/settings', $this->settingsForm(['apk_file' => \Illuminate\Http\UploadedFile::fake()->createWithContent('photo.png', "PK\x03\x04")]))->assertSessionHasErrors('apk_file');
 
-        $this->assertFileDoesNotExist(public_path('downloads/TestaCBT.apk'));
-        $this->assertNull(Setting::get('app.apk_file'));
+        $this->assertFileDoesNotExist($dir . '/downloads/TestaCBT-upload.apk');
     }
 
-    public function test_a_missing_uploaded_file_does_not_leave_a_broken_button(): void
+    public function test_with_no_app_file_anywhere_there_is_no_broken_button(): void
     {
-        Setting::put(['app.apk_file' => '/downloads/TestaCBT.apk']);
-        @unlink(public_path('downloads/TestaCBT.apk'));
+        $this->tempPublic();
 
         $this->get('/')->assertOk()->assertDontSee('Download the app (APK)')->assertSee('Use it on your phone');
     }
 
     public function test_only_admins_can_upload_the_app(): void
     {
+        $dir = $this->tempPublic();
+
         $this->actingAs($this->makeUser(3))->put('/console/settings', $this->settingsForm(['apk_file' => $this->fakeApk()]))->assertForbidden();
         $this->actingAs($this->makeUser(4))->put('/console/settings', $this->settingsForm(['apk_file' => $this->fakeApk()]))->assertForbidden();
 
-        $this->assertFileDoesNotExist(public_path('downloads/TestaCBT.apk'));
+        $this->assertFileDoesNotExist($dir . '/downloads/TestaCBT-upload.apk');
     }
     public function test_download_link_sends_each_phone_to_its_own_store(): void
     {

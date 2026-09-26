@@ -23,5 +23,5 @@ yarn-error.log
 /.zed
 .env.clone
 
-# Uploaded Android app (see Console > Content > Site settings)
-/public/downloads/*.apk
+# An Android app uploaded in the console. The release build (public/downloads/TestaCBT.apk) is committed on purpose.
+/public/downloads/TestaCBT-upload.apk
