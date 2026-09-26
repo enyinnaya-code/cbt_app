@@ -15,6 +15,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\SummernoteController;
 use App\Http\Controllers\Student;
 use App\Http\Controllers\Console;
+use App\Http\Controllers\Site;
 
 
 
@@ -22,9 +23,18 @@ use App\Http\Controllers\Console;
 
 
 Route::middleware('guest')->group(function () {
-    Route::view('/', 'welcome')->name('welcome');
+    Route::get('/', [Site\HomeController::class, 'index'])->name('welcome');
     Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
 });
+
+// Public pages: news, scholarships, blog, events and pricing. Open to everyone, signed in or not.
+Route::get('/news', [Site\PostController::class, 'index'])->defaults('page', 'news')->name('news');
+Route::get('/scholarships', [Site\PostController::class, 'index'])->defaults('page', 'scholarships')->name('scholarships');
+Route::get('/blog', [Site\PostController::class, 'index'])->defaults('page', 'blog')->name('blog');
+Route::get('/articles/{slug}', [Site\PostController::class, 'show'])->name('articles.show');
+Route::get('/events', [Site\EventController::class, 'index'])->name('events');
+Route::view('/pricing', 'site.pricing')->name('pricing');
+Route::get('/download', [Site\HomeController::class, 'download'])->name('download');
 
 // Login routes
 Route::post('/login', [LoginController::class, 'login'])->name('login.submit');
@@ -78,6 +88,11 @@ Route::middleware(['auth'])->group(function () {
             Route::post('papers/{paper}/publish', [Console\PaperController::class, 'publish'])->name('papers.publish');
             Route::post('papers/{paper}/unpublish', [Console\PaperController::class, 'unpublish'])->name('papers.unpublish');
             Route::post('packs/rebuild', [Console\PackController::class, 'rebuild'])->name('packs.rebuild');
+
+            Route::resource('posts', Console\PostController::class)->except('show');
+            Route::resource('events', Console\EventController::class)->except('show');
+            Route::get('settings', [Console\SettingsController::class, 'edit'])->name('settings.edit');
+            Route::put('settings', [Console\SettingsController::class, 'update'])->name('settings.update');
 
             Route::get('legacy', [Console\LegacyController::class, 'index'])->name('legacy.index');
             Route::post('legacy/{test}', [Console\LegacyController::class, 'store'])->name('legacy.store');

@@ -23,6 +23,23 @@ return [
         'neco' => ['label' => 'NECO objective', 'subject_count' => 1, 'questions' => ['default' => 50], 'minutes' => 60, 'score_max' => 100],
     ],
 
+    // News and article categories. `path` is the public list page a category belongs to.
+    'post_categories' => [
+        'news' => ['label' => 'News', 'path' => 'news'],
+        'exam-news' => ['label' => 'Exam news', 'path' => 'news'],
+        'results' => ['label' => 'Results', 'path' => 'news'],
+        'scholarship' => ['label' => 'Scholarship', 'path' => 'scholarships'],
+        'blog' => ['label' => 'Blog', 'path' => 'blog'],
+    ],
+
+    'event_kinds' => [
+        'exam' => 'Exam',
+        'registration' => 'Registration',
+        'results' => 'Results release',
+        'webinar' => 'Webinar',
+        'other' => 'Other',
+    ],
+
     // Number-of-questions choices offered in Practice mode.
     'practice_counts' => [10, 20, 40, 50],
 

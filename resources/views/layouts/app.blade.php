@@ -16,7 +16,10 @@
             ['Topics', 'console.topics.index', 'book', 'console.topics.*'],
             ['Packs', 'console.packs.index', 'download', 'console.packs.*'],
             ...($legacyCount ? [['Old tests', 'console.legacy.index', 'refresh', 'console.legacy.*']] : []),
-            ...($user->isAdmin() ? [['Users', 'console.users.index', 'users', 'console.users.*']] : []),
+            ...($user->isAdmin() ? [
+                ['Content', 'console.posts.index', 'news', ['console.posts.*', 'console.events.*', 'console.settings.*']],
+                ['Users', 'console.users.index', 'users', 'console.users.*'],
+            ] : []),
         ]
         : [
             ['Home', 'dashboard', 'home', 'dashboard'],
@@ -25,7 +28,9 @@
             ['Progress', 'progress', 'chart', 'progress'],
             ['Saved', 'saved', 'bookmark', 'saved'],
         ];
-    $mobileNav = $isStaff ? $nav : [
+    // Phones have room for five tabs: keep the ones staff use daily.
+    $mobileNav = $isStaff ? array_values(array_filter($nav, fn ($n) => in_array($n[1], ['dashboard', 'console.papers.index', 'console.posts.index', 'console.users.index', 'console.topics.index'], true)))
+        : [
         ['Home', 'dashboard', 'home', 'dashboard'],
         ['Practice', 'practice.index', 'book', 'practice.*'],
         ['Mock', 'mock.index', 'clock', 'mock.*'],
@@ -43,7 +48,7 @@
         <nav class="topnav" aria-label="Main">
             @foreach($nav as [$label, $routeName, $icon, $pattern])
                 @if(Route::has($routeName))
-                    <a href="{{ route($routeName) }}" class="{{ request()->routeIs($pattern) ? 'on' : '' }}">{{ $label }}</a>
+                    <a href="{{ route($routeName) }}" class="{{ request()->routeIs(...(array) $pattern) ? 'on' : '' }}">{{ $label }}</a>
                 @endif
             @endforeach
         </nav>
@@ -80,7 +85,7 @@
 <nav class="bottom-nav" aria-label="Main">
     @foreach($mobileNav as [$label, $routeName, $icon, $pattern])
         @if(Route::has($routeName))
-            <a href="{{ route($routeName) }}" class="{{ request()->routeIs($pattern) ? 'on' : '' }}">
+            <a href="{{ route($routeName) }}" class="{{ request()->routeIs(...(array) $pattern) ? 'on' : '' }}">
                 <span class="pill"><x-icon name="{{ $icon }}"/></span>{{ $label }}
             </a>
         @endif

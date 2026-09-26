@@ -1,24 +1,22 @@
 @extends('layouts.public')
 
-@section('title', 'Pass WAEC, NECO and JAMB')
-
-@section('top_actions')
-    <a class="btn btn-o btn-sm" href="{{ route('login') }}">Sign in</a>
-@endsection
+@section('title', 'Pass WAEC, NECO, JAMB, Post-UTME and IGCSE')
 
 @section('content')
 <section class="hero">
     <div class="stack" style="gap:24px">
         <div class="stack" style="gap:14px">
             <span class="badge g" style="align-self:flex-start"><x-icon name="check" size="s"/>Past questions, made simple</span>
-            <h1>Pass WAEC, NECO and JAMB.</h1>
-            <p class="muted" style="font-size:18px;max-width:52ch">Practise real past questions by subject and year, see the right answer straight away, and read a simple explanation in English or Pidgin.</p>
+            <h1>Pass your exam. Start free.</h1>
+            <p class="muted" style="font-size:18px;max-width:52ch">Practise real past questions for WAEC, NECO, JAMB, Post-UTME and IGCSE, see the right answer straight away, and read a simple explanation in English or Pidgin. Works offline on the app.</p>
         </div>
         <div class="row wrap">
             <a class="btn btn-p" href="{{ route('register') }}">Get started, it is free</a>
             <a class="btn btn-o" href="{{ route('login') }}">I already have an account</a>
         </div>
-        <p class="small muted">An offline mobile app for Android and iPhone is on the way.</p>
+        @if($exams->isNotEmpty())
+            <div class="exam-strip">@foreach($exams as $exam)<a href="{{ route('register') }}">{{ $exam->name }}</a>@endforeach</div>
+        @endif
     </div>
 
     <div class="hero-sheet" aria-hidden="true">
@@ -34,7 +32,7 @@
     <div class="card stack" style="gap:10px">
         <span class="sq c-g"><x-icon name="book"/></span>
         <h2 class="h2">Practice by subject and year</h2>
-        <p class="muted">Pick WAEC, NECO or JAMB, choose a subject and a year, and answer at your own pace. Save hard questions to come back to.</p>
+        <p class="muted">Pick your exam, choose a subject and a year, and answer at your own pace. Save hard questions to come back to.</p>
     </div>
     <div class="card stack" style="gap:10px">
         <span class="sq c-a"><x-icon name="clock"/></span>
@@ -45,6 +43,65 @@
         <span class="sq c-p"><x-icon name="chart"/></span>
         <h2 class="h2">See what to work on</h2>
         <p class="muted">Track your score for each subject and your study streak, so you know where to spend your time before the exam.</p>
+    </div>
+</section>
+
+<section class="section" id="news">
+    <div class="section-head">
+        <div><span class="eyebrow">Latest</span><h2 class="h1" style="font-size:clamp(24px,3.4vw,32px)">News and updates</h2><p>Exam news, result releases and announcements.</p></div>
+        <a class="link" href="{{ route('news') }}">All news</a>
+    </div>
+    @if($news->isEmpty())
+        <div class="card empty"><span class="sq c-b"><x-icon name="news"/></span><p class="h3">News is coming soon</p><p class="small muted">We will post exam news and result releases here.</p></div>
+    @else
+        <div class="post-grid">@foreach($news as $post)@include('site.posts._card')@endforeach</div>
+    @endif
+</section>
+
+<section class="section split" id="events">
+    <div>
+        <div class="section-head" style="margin-bottom:6px">
+            <div><span class="eyebrow">Coming up</span><h2 class="h1" style="font-size:clamp(24px,3.4vw,32px)">Upcoming events</h2></div>
+            <a class="link" href="{{ route('events') }}">All events</a>
+        </div>
+        <div class="card">
+            @forelse($events as $e)@include('site._event', ['e' => $e])
+            @empty<div class="empty"><span class="sq c-g"><x-icon name="calendar"/></span><p class="h3">No events yet</p><p class="small muted">Exam dates and deadlines will appear here.</p></div>
+            @endforelse
+        </div>
+    </div>
+    <div>
+        <div class="section-head" style="margin-bottom:6px">
+            <div><span class="eyebrow">Apply</span><h2 class="h1" style="font-size:clamp(24px,3.4vw,32px)">Scholarships</h2></div>
+            <a class="link" href="{{ route('scholarships') }}">See all</a>
+        </div>
+        <div class="card">
+            @forelse($scholarships as $s)
+                <a class="li" href="{{ route('articles.show', $s->slug) }}" style="text-decoration:none;color:inherit">
+                    <span class="sq c-p"><x-icon name="cap"/></span>
+                    <div class="grow"><p class="h3">{{ $s->title }}</p><p class="small muted">{{ $s->source ?: 'Scholarship' }}@if($s->deadline) &middot; closes {{ $s->deadline->format('j M Y') }}@endif</p></div>
+                    <x-icon name="chevR" size="s"/>
+                </a>
+            @empty
+                <div class="empty"><span class="sq c-p"><x-icon name="cap"/></span><p class="h3">No open scholarships right now</p><p class="small muted">We post new ones as they open.</p></div>
+            @endforelse
+        </div>
+    </div>
+</section>
+
+<section class="section" id="download">
+    <div class="app-band">
+        <div class="stack" style="gap:16px">
+            <h2>Take TestaCBT with you</h2>
+            <p>Download the app once, then practise anywhere, even with no data. Your progress saves to your account when you are online.</p>
+            @include('site._stores', ['stores' => $stores])
+        </div>
+        <ul>
+            <li><x-icon name="wifioff"/>Works offline after the first download</li>
+            <li><x-icon name="clock"/>Timed mock exams that keep your place</li>
+            <li><x-icon name="download"/>Small downloads, one subject at a time</li>
+            <li><x-icon name="user"/>Same account on the web and your phone</li>
+        </ul>
     </div>
 </section>
 @endsection

@@ -25,7 +25,7 @@ class StudentHomeTest extends TestCase
 
     public function test_guests_see_the_welcome_page_and_signed_in_users_are_sent_home(): void
     {
-        $this->get('/')->assertOk()->assertSee('Pass WAEC, NECO and JAMB')->assertSee('Get started');
+        $this->get('/')->assertOk()->assertSee('Pass your exam')->assertSee('Get started');
         $this->get('/login')->assertOk()->assertSee('Welcome back');
         $this->get('/register')->assertOk()->assertSee('Create your account');
 
