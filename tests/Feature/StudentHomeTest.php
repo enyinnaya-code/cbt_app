@@ -32,8 +32,12 @@ class StudentHomeTest extends TestCase
         // A signed-in student can come back to the landing page, and it offers the way back to their account.
         $this->actingAs($this->makeUser())->get('/')->assertOk()->assertSee('Go to my dashboard')->assertSee('Open my account')->assertDontSee('I already have an account');
         $this->actingAs($this->makeUser())->get('/login')->assertRedirect('/dashboard');
-        $this->actingAs($this->makeUser())->get('/dashboard')->assertOk()->assertSee('Back to the website');
-        $this->actingAs($this->makeUser(2))->get('/dashboard')->assertOk()->assertSee('Back to the website');
+        // The top bar always has a visible link to the website, the logo goes there too, and the account menu keeps its own entry.
+        foreach ([$this->makeUser(), $this->makeUser(3), $this->makeUser(2)] as $user) {
+            $html = $this->actingAs($user)->get('/dashboard')->assertOk()->assertSee('Back to the website')->getContent();
+            $this->assertStringContainsString('class="btn btn-o btn-sm" href="' . route('welcome') . '"', $html);
+            $this->assertMatchesRegularExpression('#<a class="brand" href="' . preg_quote(route('welcome'), '#') . '"#', $html);
+        }
     }
 
     public function test_logging_out_returns_to_the_welcome_page(): void

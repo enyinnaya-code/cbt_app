@@ -44,7 +44,7 @@
 @section('body')
 <header class="topbar">
     <div class="topbar-in">
-        <a class="brand" href="{{ route('dashboard') }}">
+        <a class="brand" href="{{ route('welcome') }}" aria-label="TestaCBT website">
             <span class="brand-mark"><x-icon name="check" size="s"/></span>TestaCBT
         </a>
         <nav class="topnav" aria-label="Main">
@@ -55,6 +55,7 @@
             @endforeach
         </nav>
         <div class="topbar-r">
+            <a class="btn btn-o btn-sm" href="{{ route('welcome') }}"><x-icon name="globe" size="s"/><span><span class="long">Back to </span>website</span></a>
             @if($isStaff)<span class="badge neutral">{{ ucfirst($user->role) }}</span>@endif
             <div class="usermenu">
                 <button type="button" class="avatar sm" data-menu-toggle aria-label="Account menu" style="border:0;cursor:pointer">

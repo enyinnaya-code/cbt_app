@@ -342,3 +342,6 @@ table.table{width:100%;border-collapse:collapse;font-size:14px}
 .footer-cols a:hover{color:var(--text)}
 .footer-cols h4{font-size:13px;color:var(--text);margin-bottom:6px}
 @media (max-width:700px){.footer-cols{grid-template-columns:1fr 1fr}}
+
+/* The way back to the public website is always in the top bar; on narrow phones it shortens to "website". */
+@media (max-width:520px){.topbar-r .long{display:none}.topbar-r .badge{display:none}}
