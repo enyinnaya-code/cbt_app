@@ -17,16 +17,34 @@ class UserController extends Controller
     {
         $f = $request->validate(['q' => ['nullable', 'string', 'max:80'], 'role' => ['nullable', 'in:admin,examiner,student'], 'state' => ['nullable', 'in:active,suspended']]);
 
-        $users = User::query()
+        $filtered = fn (string $role) => User::query()->where('role', $role)
             ->when($f['q'] ?? null, fn ($q, $v) => $q->where(fn ($w) => $w->where('name', 'like', '%' . addcslashes($v, '%_\\') . '%')->orWhere('email', 'like', '%' . addcslashes($v, '%_\\') . '%')))
-            ->when($f['role'] ?? null, fn ($q, $v) => $q->where('role', $v))
             ->when(($f['state'] ?? null) === 'active', fn ($q) => $q->where('is_active', 1))
-            ->when(($f['state'] ?? null) === 'suspended', fn ($q) => $q->where('is_active', 0))
-            ->orderByRaw("CASE role WHEN 'admin' THEN 0 WHEN 'examiner' THEN 1 ELSE 2 END")->orderBy('name')
-            ->paginate(25)->withQueryString();
+            ->when(($f['state'] ?? null) === 'suspended', fn ($q) => $q->where('is_active', 0));
+
+        // Admins, examiners and students are kept in three separate tables so nobody is mistaken for another role.
+        // Each has its own page number, so paging through students does not move the admins table.
+        $sections = [
+            ['role' => User::ROLE_ADMIN, 'title' => 'Admins', 'empty' => 'No admins'],
+            ['role' => User::ROLE_EXAMINER, 'title' => 'Examiners', 'empty' => 'No examiners'],
+            ['role' => User::ROLE_STUDENT, 'title' => 'Students', 'empty' => 'No students'],
+        ];
+
+        $tables = [];
+        foreach ($sections as $section) {
+            if (! empty($f['role']) && $f['role'] !== $section['role']) { continue; }
+
+            $paginator = $filtered($section['role'])->orderBy('name')->orderBy('id')
+                ->paginate(25, ['*'], $section['role'] . 's_page')->withQueryString();
+
+            // While searching or filtering by status, a table with nothing in it is just noise.
+            if ($paginator->total() === 0 && (! empty($f['q']) || ! empty($f['state']))) { continue; }
+
+            $tables[] = $section + ['users' => $paginator];
+        }
 
         return view('console.users', [
-            'users' => $users,
+            'tables' => $tables,
             'filters' => $f,
             'counts' => User::selectRaw('role, COUNT(*) as n')->groupBy('role')->pluck('n', 'role'),
         ]);

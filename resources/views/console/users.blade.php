@@ -26,42 +26,51 @@
 
 <form method="GET" class="filters card" style="padding:14px">
     <div class="field"><label for="uq">Search</label><input id="uq" name="q" class="input" value="{{ $filters['q'] ?? '' }}" placeholder="Name or email"></div>
-    <div class="field" style="max-width:170px"><label for="ur">Role</label><select id="ur" name="role" class="input"><option value="">All</option>@foreach(['admin', 'examiner', 'student'] as $r)<option value="{{ $r }}" @selected(($filters['role'] ?? null) === $r)>{{ ucfirst($r) }}</option>@endforeach</select></div>
+    <div class="field" style="max-width:170px"><label for="ur">Show</label><select id="ur" name="role" class="input"><option value="">All three tables</option>@foreach(['admin' => 'Admins only', 'examiner' => 'Examiners only', 'student' => 'Students only'] as $r => $label)<option value="{{ $r }}" @selected(($filters['role'] ?? null) === $r)>{{ $label }}</option>@endforeach</select></div>
     <div class="field" style="max-width:170px"><label for="us">Status</label><select id="us" name="state" class="input"><option value="">All</option><option value="active" @selected(($filters['state'] ?? null) === 'active')>Active</option><option value="suspended" @selected(($filters['state'] ?? null) === 'suspended')>Suspended</option></select></div>
     <div class="row"><button class="btn btn-o btn-sm" type="submit">Filter</button>@if(array_filter($filters))<a class="btn btn-t btn-sm" href="{{ route('console.users.index') }}">Clear</a>@endif</div>
 </form>
 
-<div class="table-wrap">
-    <table class="table">
-        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Joined</th><th></th></tr></thead>
-        <tbody>
-        @forelse($users as $u)
-            <tr>
-                <td>{{ $u->name }}@if($u->id === $me) <span class="badge neutral">you</span>@endif</td>
-                <td class="small">{{ $u->email }}@if($u->google_id) <span class="badge neutral">Google</span>@endif</td>
-                <td>
-                    @if($u->id === $me)
-                        <span class="badge g">{{ ucfirst($u->role) }}</span>
-                    @else
-                        <form method="POST" action="{{ route('console.users.role', $u) }}" class="row" style="gap:6px">@csrf @method('PATCH')
-                            <select name="role" class="input" style="min-height:36px;width:auto;padding:0 10px" aria-label="Role for {{ $u->name }}" onchange="this.form.requestSubmit()">
-                                @foreach(['student', 'examiner', 'admin'] as $r)<option value="{{ $r }}" @selected($u->role === $r)>{{ ucfirst($r) }}</option>@endforeach
-                            </select>
-                        </form>
-                    @endif
-                </td>
-                <td><span class="badge {{ $u->is_active ? 'g' : 'r' }}">{{ $u->is_active ? 'Active' : 'Suspended' }}</span></td>
-                <td class="small muted">{{ $u->created_at?->format('j M Y') }}</td>
-                <td><div class="actions">@if($u->id !== $me)
-                    <form method="POST" action="{{ route('console.users.toggle', $u) }}">@csrf @method('PATCH')
-                        <button class="btn {{ $u->is_active ? 'btn-d' : 'btn-o' }} btn-sm" type="submit" @if($u->is_active) data-confirm="Suspend {{ $u->name }}? They will be signed out and unable to sign in." @endif>{{ $u->is_active ? 'Suspend' : 'Reactivate' }}</button></form>@endif</div></td>
-            </tr>
-        @empty
-            <tr><td colspan="6"><div class="empty"><p class="h3">No users match</p></div></td></tr>
-        @endforelse
-        </tbody>
-    </table>
-</div>
-
-{{ $users->links('vendor.pagination.testacbt') }}
+@forelse($tables as $t)
+<section class="stack" style="gap:10px" aria-labelledby="users-{{ $t['role'] }}">
+    <div class="row between">
+        <h2 class="h2" id="users-{{ $t['role'] }}">{{ $t['title'] }} <span class="badge neutral">{{ number_format($t['users']->total()) }}</span></h2>
+    </div>
+    <div class="table-wrap">
+        <table class="table">
+            <thead><tr><th style="width:56px">S/N</th><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Joined</th><th></th></tr></thead>
+            <tbody>
+            @forelse($t['users'] as $u)
+                <tr>
+                    <td class="muted">{{ $t['users']->firstItem() + $loop->index }}</td>
+                    <td>{{ $u->name }}@if($u->id === $me) <span class="badge neutral">you</span>@endif</td>
+                    <td class="small">{{ $u->email }}@if($u->google_id) <span class="badge neutral">Google</span>@endif</td>
+                    <td>
+                        @if($u->id === $me)
+                            <span class="badge g">{{ ucfirst($u->role) }}</span>
+                        @else
+                            <form method="POST" action="{{ route('console.users.role', $u) }}" class="row" style="gap:6px">@csrf @method('PATCH')
+                                <select name="role" class="input" style="min-height:36px;width:auto;padding:0 10px" aria-label="Role for {{ $u->name }}" onchange="this.form.requestSubmit()">
+                                    @foreach(['student', 'examiner', 'admin'] as $r)<option value="{{ $r }}" @selected($u->role === $r)>{{ ucfirst($r) }}</option>@endforeach
+                                </select>
+                            </form>
+                        @endif
+                    </td>
+                    <td><span class="badge {{ $u->is_active ? 'g' : 'r' }}">{{ $u->is_active ? 'Active' : 'Suspended' }}</span></td>
+                    <td class="small muted">{{ $u->created_at?->format('j M Y') }}</td>
+                    <td><div class="actions">@if($u->id !== $me)
+                        <form method="POST" action="{{ route('console.users.toggle', $u) }}">@csrf @method('PATCH')
+                            <button class="btn {{ $u->is_active ? 'btn-d' : 'btn-o' }} btn-sm" type="submit" @if($u->is_active) data-confirm="Suspend {{ $u->name }}? They will be signed out and unable to sign in." @endif>{{ $u->is_active ? 'Suspend' : 'Reactivate' }}</button></form>@endif</div></td>
+                </tr>
+            @empty
+                <tr><td colspan="7"><div class="empty"><p class="h3">{{ $t['empty'] }}</p></div></td></tr>
+            @endforelse
+            </tbody>
+        </table>
+    </div>
+    {{ $t['users']->links('vendor.pagination.testacbt') }}
+</section>
+@empty
+    <div class="card empty"><p class="h3">No users match</p><p class="small muted">Try a different name or clear the filters.</p></div>
+@endforelse
 @endsection
