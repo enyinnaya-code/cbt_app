@@ -4,7 +4,11 @@ namespace App\Http\Controllers\Student;
 
 use App\Http\Controllers\Controller;
 use App\Models\Exam;
+use App\Models\Paper;
+use App\Models\Question;
 use App\Models\Subject;
+use App\Services\Access;
+use App\Services\Pricing;
 use App\Services\ProgressRecorder;
 use App\Services\QuestionSelector;
 use Illuminate\Http\JsonResponse;
@@ -24,19 +28,33 @@ class PracticeController extends Controller
             ?? $exams->firstWhere('slug', ($user->preferred_exams ?? [])[0] ?? null)
             ?? $exams->first();
 
+        $access = Access::for($user);
         $available = $exam ? $selector->availability($exam) : collect();
 
         $subjects = $exam
             ? $exam->subjects()->where('subjects.is_active', true)->orderBy('subjects.name')->get()
-                ->map(function ($s) use ($available) {
-                    $s->available = (int) ($available[$s->id] ?? 0);
+                ->map(function ($s) use ($available, $access, $exam) {
+                    $s->total = (int) ($available[$s->id] ?? 0);
+                    $s->locked = ! $access->full($exam->id, $s->id);
+                    // Until it is unlocked, a subject offers only its free sample.
+                    $s->available = $s->locked ? min($s->total, $access->freeLimit($exam->id, $s->id)) : $s->total;
+                    $s->price = $access->price($exam->id, $s->id);
+                    $s->expires = $access->expiresAt($exam->id, $s->id);
                     $s->label = $s->pivot->display_name ?: $s->name;
                     return $s;
-                })->filter(fn ($s) => $s->available > 0)->values()
+                })->filter(fn ($s) => $s->total > 0)->values()
             : collect();
 
         $subject = $subjects->firstWhere('slug', $request->query('subject'));
-        $years = $exam && $subject ? $selector->years($exam, $subject) : collect();
+
+        // A locked subject can only be practised from its free sample, so offer only the years and topics found in it.
+        $freeIds = $exam && $subject && $subject->locked ? array_values($access->freeIds($exam->id, $subject->id)) : null;
+        $years = $exam && $subject
+            ? ($freeIds === null ? $selector->years($exam, $subject) : Paper::whereHas('questions', fn ($q) => $q->whereIn('id', $freeIds ?: [0]))->orderByDesc('year')->pluck('year')->unique()->values())
+            : collect();
+        $topics = $subject
+            ? $subject->topics()->when($freeIds !== null, fn ($q) => $q->whereIn('id', Question::whereIn('id', $freeIds ?: [0])->whereNotNull('topic_id')->pluck('topic_id')))->orderBy('name')->get(['id', 'name'])
+            : collect();
 
         return view('student.practice', [
             'exams' => $exams,
@@ -45,7 +63,8 @@ class PracticeController extends Controller
             'subject' => $subject,
             'years' => $years,
             'counts' => config('testacbt.practice_counts'),
-            'topics' => $subject ? $subject->topics()->orderBy('name')->get(['id', 'name']) : collect(),
+            'topics' => $topics,
+            'unlock' => $exam && $subject && $subject->locked ? route('checkout.show', ['exam' => $exam->slug, 'subjects' => [$subject->slug]]) : null,
         ]);
     }
 
@@ -66,7 +85,7 @@ class PracticeController extends Controller
         $count = (int) $data['count'];
 
         if (! empty($data['saved'])) {
-            $picked = $selector->saved($user, $count);
+            $picked = $selector->saved($user, $count, null, Access::for($user));
             $title = 'Saved questions';
             $subtitle = null;
             $again = route('saved');
@@ -76,7 +95,7 @@ class PracticeController extends Controller
             $topic = ! empty($data['topic']) ? \App\Models\Topic::where('subject_id', $subject->id)->find($data['topic']) : null;
             abort_if(! empty($data['topic']) && ! $topic, 404);
 
-            $picked = $selector->practice($exam, $subject, $data['year'] ?? null, $count, $topic?->id);
+            $picked = $selector->practice($exam, $subject, $data['year'] ?? null, $count, $topic?->id, null, Access::for($user));
             // JAMB calls English "Use of English"; show each exam's own name for the subject.
             $title = ($exam?->subjects()->whereKey($subject->id)->first()?->pivot->display_name) ?: $subject->name;
             $subtitle = $topic

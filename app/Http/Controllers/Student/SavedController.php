@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Student;
 
 use App\Http\Controllers\Controller;
+use App\Services\Access;
 use App\Services\ProgressRecorder;
 use App\Support\HtmlCleaner;
 use Illuminate\Http\Request;
@@ -12,7 +13,9 @@ class SavedController extends Controller
 {
     public function index(Request $request)
     {
-        $rows = DB::table('bookmarks as b')
+        $access = Access::for($request->user());
+
+        $all = DB::table('bookmarks as b')
             ->join('questions as q', 'q.id', '=', 'b.question_id')
             ->join('papers as p', 'p.id', '=', 'q.paper_id')
             ->join('exams as e', 'e.id', '=', 'p.exam_id')
@@ -22,8 +25,11 @@ class SavedController extends Controller
             ->where('p.status', 'published')
             ->orderByDesc('b.changed_at')
             // Each exam has its own name for some subjects (JAMB: "Use of English").
-            ->select('q.id', 'q.question', 'q.options', 'q.answer', 'q.explanation_en', 'q.explanation_pcm', 'e.name as exam', DB::raw('COALESCE(es.display_name, s.name) as subject'), 'p.year')
-            ->get()
+            ->select('q.id', 'q.question', 'q.options', 'q.answer', 'q.explanation_en', 'q.explanation_pcm', 'p.exam_id', 'p.subject_id', 'e.name as exam', DB::raw('COALESCE(es.display_name, s.name) as subject'), 'p.year')
+            ->get();
+
+        // A saved question whose subject is no longer unlocked (a purchase ran out) stays saved but is hidden until renewed.
+        $rows = $all->filter(fn ($r) => $access->allows($r->exam_id, $r->subject_id, $r->id))->values()
             ->map(function ($r) {
                 $options = json_decode((string) $r->options, true) ?: [];
                 $r->question = HtmlCleaner::clean($r->question);
@@ -34,7 +40,7 @@ class SavedController extends Controller
                 return $r;
             });
 
-        return view('student.saved', ['questions' => $rows, 'lang' => $request->user()->explanation_language ?: 'en']);
+        return view('student.saved', ['questions' => $rows, 'locked' => $all->count() - $rows->count(), 'lang' => $request->user()->explanation_language ?: 'en']);
     }
 
     /** Save or un-save a question. Works from the practice runner (JSON) and from the Saved page (form). */

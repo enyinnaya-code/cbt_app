@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Exam extends Model
 {
-    protected $fillable = ['name', 'slug', 'is_active', 'sort_order'];
+    protected $fillable = ['name', 'slug', 'is_active', 'sort_order', 'bundle_price'];
 
     protected function casts(): array
     {
@@ -15,7 +15,7 @@ class Exam extends Model
 
     public function subjects()
     {
-        return $this->belongsToMany(Subject::class, 'exam_subject')->withPivot('display_name');
+        return $this->belongsToMany(Subject::class, 'exam_subject')->withPivot('display_name', 'price', 'free_questions');
     }
 
     public function papers()

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Student;
 use App\Http\Controllers\Controller;
 use App\Models\Exam;
 use App\Models\MockRun;
+use App\Services\Access;
 use App\Services\MockService;
 use App\Services\QuestionSelector;
 use Illuminate\Http\JsonResponse;
@@ -35,7 +36,7 @@ class MockController extends Controller
             'exams' => $exams,
             'exam' => $exam,
             'format' => $exam ? $this->mocks->format($exam) : null,
-            'options' => $exam ? $this->mocks->subjectOptions($exam) : collect(),
+            'options' => $exam ? $this->mocks->subjectOptions($exam, Access::for($user)) : collect(),
             'active' => $active,
             'recent' => MockRun::where('user_id', $user->id)->whereNotNull('submitted_at')->with('exam:id,name')->latest('id')->limit(3)->get(),
         ]);

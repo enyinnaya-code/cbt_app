@@ -9,6 +9,10 @@
     $picks = $need - ($hasCompulsory ? 1 : 0);
     $totalQuestions = $format ? array_sum(array_map(fn ($o) => $o->planned, $options->take($need)->all())) : 0;
     $tones = ['c-a', 'c-b', 'c-p', 'c-g'];
+    $unlocked = $options->where('locked', false);
+    $lockedCompulsory = $options->contains(fn ($o) => $o->compulsory && $o->locked);
+    // A mock needs whole subjects, so it cannot start on the free sample alone.
+    $blocked = $options->count() >= $need && ($lockedCompulsory || $unlocked->count() < $need);
 @endphp
 
 @section('content')
@@ -51,7 +55,15 @@
             <div><p class="tiny muted">Scored out of</p><p class="h3">{{ 100 * $need }}</p></div>
         </div>
 
-        <form method="POST" action="{{ route('mock.start') }}" class="stack" style="gap:22px" id="mock-form" data-need="{{ $picks }}">
+        @if($blocked)
+            <div class="card row between wrap" style="background:var(--accent-soft);border:0">
+                <div><p class="h3">Unlock your subjects to take this mock</p>
+                    <p class="small">A mock exam uses every question in a subject, so the subjects you pick must be unlocked.{{ $lockedCompulsory ? ' ' . $options->firstWhere('compulsory', true)->name . ' is needed for every ' . $exam->name . ' mock.' : '' }}</p></div>
+                <a class="btn btn-p" href="{{ route('checkout.show', ['exam' => $exam->slug]) }}"><x-icon name="lock" size="s"/>Unlock subjects</a>
+            </div>
+        @endif
+
+        <form method="POST" action="{{ route('mock.start') }}" class="stack" style="gap:22px" id="mock-form" data-need="{{ $picks }}" data-blocked="{{ $blocked ? 1 : 0 }}">
             @csrf
             <input type="hidden" name="exam" value="{{ $exam->slug }}">
             @error('subjects')<div class="alert err" role="alert">{{ $message }}</div>@enderror
@@ -60,6 +72,13 @@
                 <h2 class="h3">{{ $need === 1 ? 'Choose a subject' : ($hasCompulsory ? 'Choose ' . $picks . ' more ' . Str::plural('subject', $picks) : 'Choose ' . $need . ' subjects') }}</h2>
                 <div class="grid3">
                     @foreach($options as $i => $s)
+                        @if($s->locked)
+                        <a class="qa" href="{{ route('checkout.show', ['exam' => $exam->slug, 'subjects' => [$s->slug]]) }}" style="opacity:.85">
+                            <span class="row between"><span class="sq {{ $tones[$i % 4] }}">{{ $s->code }}</span><span class="badge neutral"><x-icon name="lock" size="s"/>Locked</span></span>
+                            <span><span class="h3" style="display:block">{{ $s->name }}</span><span class="small muted">Unlock for {{ \App\Services\Pricing::naira($s->price) }}</span></span>
+                        </a>
+                        @continue
+                        @endif
                         <label class="qa" style="cursor:{{ $s->compulsory ? 'default' : 'pointer' }}">
                             <span class="row between">
                                 <span class="sq {{ $tones[$i % 4] }}">{{ $s->code }}</span>
@@ -81,7 +100,7 @@
             </section>
 
             <div class="row wrap">
-                <button class="btn btn-p" type="submit" id="mock-start">Start mock exam</button>
+                <button class="btn btn-p" type="submit" id="mock-start" @disabled($blocked)>Start mock exam</button>
                 <span class="small muted" id="mock-hint"></span>
             </div>
         </form>
@@ -116,9 +135,10 @@
     if (boxes.length && boxes[0].type === 'checkbox') {
       boxes.forEach(function (b) { b.disabled = !b.checked && n >= need; });
     }
-    start.disabled = n !== need;
-    start.style.opacity = n === need ? '' : '.5';
-    hint.textContent = n === need ? '' : 'Pick ' + (need - n) + ' more.';
+    var blocked = form.dataset.blocked === '1';
+    start.disabled = blocked || n !== need;
+    start.style.opacity = start.disabled ? '.5' : '';
+    hint.textContent = blocked || n === need ? '' : 'Pick ' + (need - n) + ' more.';
   }
   boxes.forEach(function (b) { b.addEventListener('change', sync); });
   sync();

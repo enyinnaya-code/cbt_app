@@ -14,7 +14,21 @@ use Illuminate\Support\Facades\DB;
  */
 class ProgressRecorder
 {
-    public function __construct(private User $user) {}
+    private Access $access;
+
+    /**
+     * @param  bool  $trusted  skip the unlock check. Only for work the server itself did for the student, such as marking a
+     *                         mock exam they were allowed to start.
+     */
+    public function __construct(private User $user, ?Access $access = null, private bool $trusted = false)
+    {
+        $this->access = $access ?? Access::for($user);
+    }
+
+    private function permitted(Question $question): bool
+    {
+        return $this->trusted || $this->access->allowsQuestion($question);
+    }
 
     /**
      * @param  array<int, array{client_uuid:string,question_id:int,mode:string,selected?:?string,time_ms?:?int,answered_at:string}>  $items
@@ -23,14 +37,15 @@ class ProgressRecorder
     public function attempts(array $items, ?Carbon $now = null): array
     {
         $now ??= now();
-        $questions = Question::whereIn('id', collect($items)->pluck('question_id')->unique())->get(['id', 'answer', 'not_question'])->keyBy('id');
+        $questions = Question::whereIn('id', collect($items)->pluck('question_id')->unique())->with('paper:id,exam_id,subject_id')->get(['id', 'answer', 'not_question', 'paper_id'])->keyBy('id');
 
         $rows = [];
         $rejected = 0;
 
         foreach ($items as $a) {
             $q = $questions->get($a['question_id']);
-            if (! $q || (int) $q->not_question === 1) { $rejected++; continue; }
+            // Recording an answer reveals whether it was right, so a question the student has not unlocked is refused.
+            if (! $q || (int) $q->not_question === 1 || ! $this->permitted($q)) { $rejected++; continue; }
 
             $selected = isset($a['selected']) ? strtoupper($a['selected']) : null;
             $rows[] = [
@@ -65,9 +80,12 @@ class ProgressRecorder
     public function bookmarks(array $items, ?Carbon $now = null, bool $authoritative = false): array
     {
         $now ??= now();
-        $known = Question::whereIn('id', collect($items)->pluck('question_id')->unique())->pluck('id')->flip();
+        $known = Question::whereIn('id', collect($items)->pluck('question_id')->unique())->with('paper:id,exam_id,subject_id')->get(['id', 'paper_id'])->keyBy('id');
 
-        $incoming = collect($items)->filter(fn ($b) => $known->has($b['question_id']));
+        // Saving a question shows its answer on the Saved page, so only questions the student can open may be saved.
+        // Removing one is always allowed.
+        $incoming = collect($items)->filter(fn ($b) => $known->has($b['question_id'])
+            && (! $b['bookmarked'] || $this->permitted($known->get($b['question_id']))));
         $rejected = count($items) - $incoming->count();
 
         $existing = DB::table('bookmarks')->where('user_id', $this->user->id)

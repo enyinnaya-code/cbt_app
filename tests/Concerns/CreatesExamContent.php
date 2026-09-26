@@ -23,11 +23,12 @@ trait CreatesExamContent
         ]);
     }
 
-    protected function makeExamAndSubject(string $exam = 'WAEC', string $subject = 'Physics', ?string $display = null): array
+    /** Subjects made here are free (price 0) unless a test says otherwise, so tests about practice and mocks need no purchase. */
+    protected function makeExamAndSubject(string $exam = 'WAEC', string $subject = 'Physics', ?string $display = null, ?int $price = 0): array
     {
         $e = Exam::firstOrCreate(['slug' => Str::slug($exam)], ['name' => $exam]);
         $s = Subject::firstOrCreate(['slug' => Str::slug($subject)], ['name' => $subject, 'code' => substr($subject, 0, 2)]);
-        $e->subjects()->syncWithoutDetaching([$s->id => ['display_name' => $display]]);
+        $e->subjects()->syncWithoutDetaching([$s->id => ['display_name' => $display, 'price' => $price]]);
 
         return [$e, $s];
     }

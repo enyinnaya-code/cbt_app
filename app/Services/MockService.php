@@ -41,9 +41,11 @@ class MockService
     /**
      * Subjects that have enough questions for a mock, with the count the exam would use for each.
      *
-     * @return Collection<int, object{id:int,slug:string,name:string,code:string,available:int,planned:int,compulsory:bool}>
+     * With $access, each subject also says whether it is locked for that student (a mock needs the whole subject).
+     *
+     * @return Collection<int, object{id:int,slug:string,name:string,code:string,available:int,planned:int,compulsory:bool,locked:bool,price:int}>
      */
-    public function subjectOptions(Exam $exam): Collection
+    public function subjectOptions(Exam $exam, ?Access $access = null): Collection
     {
         $format = $this->format($exam);
         $available = $this->selector->availability($exam);
@@ -55,6 +57,8 @@ class MockService
                 'available' => (int) ($available[$s->id] ?? 0),
                 'planned' => $this->plannedQuestions($format, $s->slug),
                 'compulsory' => ($format['compulsory'] ?? null) === $s->slug,
+                'locked' => $access !== null && ! $access->full($exam->id, $s->id),
+                'price' => $access ? $access->price($exam->id, $s->id) : Pricing::price($s->pivot),
             ])
             ->filter(fn ($s) => $s->available >= self::MIN_QUESTIONS)
             ->sortByDesc('compulsory')->values();
@@ -67,7 +71,7 @@ class MockService
     public function start(User $user, Exam $exam, array $subjectSlugs, ?int $seed = null): MockRun
     {
         $format = $this->format($exam);
-        $options = $this->subjectOptions($exam)->keyBy('slug');
+        $options = $this->subjectOptions($exam, Access::for($user))->keyBy('slug');
         $slugs = array_values(array_unique($subjectSlugs));
 
         $fail = fn (string $message) => throw ValidationException::withMessages(['subjects' => $message]);
@@ -80,6 +84,7 @@ class MockService
         }
         foreach ($slugs as $slug) {
             if (! $options->has($slug)) { $fail('One of those subjects is not available for this exam yet.'); }
+            if ($options[$slug]->locked) { $fail("Unlock {$options[$slug]->name} to include it in a mock exam."); }
         }
 
         // Compulsory subject first, the rest A to Z.
@@ -198,7 +203,7 @@ class MockService
             $used = (int) min($run->minutes * 60, max(0, $run->started_at->diffInSeconds($now)));
 
             // Feed the student's progress the same way practice does.
-            $recorder = new ProgressRecorder($run->user);
+            $recorder = new ProgressRecorder($run->user, trusted: true);
             $recorder->attempts(collect($given)->map(fn ($letter, $qid) => [
                 'client_uuid' => (string) Str::uuid(), 'question_id' => (int) $qid, 'mode' => 'mock', 'selected' => $letter,
                 'answered_at' => $now->toIso8601String(),

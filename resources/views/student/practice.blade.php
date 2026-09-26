@@ -33,14 +33,24 @@
                 @foreach($subjects as $i => $s)
                     <a href="{{ route('practice.index', ['exam' => $exam->slug, 'subject' => $s->slug]) }}"
                        class="qa {{ $subject && $subject->id === $s->id ? 'sel' : '' }}">
-                        <span class="row between"><span class="sq {{ $tones[$i % 4] }}">{{ $s->code }}</span>@if($subject && $subject->id === $s->id)<x-icon name="check" size="s"/>@endif</span>
-                        <span><span class="h3" style="display:block">{{ $s->label }}</span><span class="small muted">{{ number_format($s->available) }} {{ Str::plural('question', $s->available) }}</span></span>
+                        <span class="row between"><span class="sq {{ $tones[$i % 4] }}">{{ $s->code }}</span>@if($s->locked)<span class="badge neutral"><x-icon name="lock" size="s"/>Free sample</span>@elseif($subject && $subject->id === $s->id)<x-icon name="check" size="s"/>@endif</span>
+                        <span><span class="h3" style="display:block">{{ $s->label }}</span>@if($s->locked)<span class="small muted">{{ number_format($s->available) }} free of {{ number_format($s->total) }}</span>
+                            @else<span class="small muted">{{ number_format($s->available) }} {{ Str::plural('question', $s->available) }}@if($s->expires) &middot; unlocked @endif</span>@endif</span>
                     </a>
                 @endforeach
             </div>
         </section>
 
         @if($subject)
+            @if($unlock)
+                <div class="card row between wrap" style="background:var(--accent-soft);border:0">
+                    <div><p class="h3">You are using the free sample of {{ $subject->label }}</p>
+                        <p class="small">{{ number_format($subject->available) }} of {{ number_format($subject->total) }} questions. Unlock all of them for {{ \App\Services\Pricing::naira($subject->price) }}, for {{ \App\Services\Pricing::accessDays() }} days.</p></div>
+                    <a class="btn btn-p" href="{{ $unlock }}"><x-icon name="lock" size="s"/>Unlock {{ $subject->label }}</a>
+                </div>
+            @elseif($subject->expires)
+                <p class="small muted">Unlocked until {{ $subject->expires->format('j F Y') }}.</p>
+            @endif
             <form method="GET" action="{{ route('practice.session') }}" class="stack" style="gap:24px">
                 <input type="hidden" name="exam" value="{{ $exam->slug }}">
                 <input type="hidden" name="subject" value="{{ $subject->slug }}">

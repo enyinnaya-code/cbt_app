@@ -14,6 +14,10 @@
     @endif
 </div>
 
+@if($locked > 0)
+    <div class="alert info">{{ $locked }} saved {{ Str::plural('question', $locked) }} {{ $locked === 1 ? 'is' : 'are' }} hidden because {{ $locked === 1 ? 'its subject is' : 'their subjects are' }} locked. <a class="link" href="{{ route('pricing') }}">Unlock to see {{ $locked === 1 ? 'it' : 'them' }} again</a>.</div>
+@endif
+
 @forelse($questions as $q)
     <article class="card stack" style="gap:14px">
         <div class="row between wrap">

@@ -21,6 +21,10 @@ return [
         ],
         'waec' => ['label' => 'WAEC objective', 'subject_count' => 1, 'questions' => ['default' => 50], 'minutes' => 60, 'score_max' => 100],
         'neco' => ['label' => 'NECO objective', 'subject_count' => 1, 'questions' => ['default' => 50], 'minutes' => 60, 'score_max' => 100],
+        // Post-UTME differs by university (many use 40 questions in 30 to 60 minutes); IGCSE multiple-choice papers are
+        // usually 40 questions in 45 minutes. These are sensible defaults: confirm against the schools you cover.
+        'post-utme' => ['label' => 'Post-UTME', 'subject_count' => 1, 'questions' => ['default' => 40], 'minutes' => 45, 'score_max' => 100],
+        'igcse' => ['label' => 'IGCSE multiple choice', 'subject_count' => 1, 'questions' => ['default' => 40], 'minutes' => 45, 'score_max' => 100],
     ],
 
     // News and article categories. `path` is the public list page a category belongs to.

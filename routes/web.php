@@ -33,7 +33,9 @@ Route::get('/scholarships', [Site\PostController::class, 'index'])->defaults('pa
 Route::get('/blog', [Site\PostController::class, 'index'])->defaults('page', 'blog')->name('blog');
 Route::get('/articles/{slug}', [Site\PostController::class, 'show'])->name('articles.show');
 Route::get('/events', [Site\EventController::class, 'index'])->name('events');
-Route::view('/pricing', 'site.pricing')->name('pricing');
+Route::get('/pricing', [Site\PricingController::class, 'index'])->name('pricing');
+// Paystack sends the student back here; it checks with Paystack itself, so no sign-in is needed to land on it.
+Route::get('/checkout/callback', [Student\CheckoutController::class, 'callback'])->name('checkout.callback');
 Route::get('/download', [Site\HomeController::class, 'download'])->name('download');
 
 // Login routes
@@ -89,6 +91,20 @@ Route::middleware(['auth'])->group(function () {
             Route::post('papers/{paper}/unpublish', [Console\PaperController::class, 'unpublish'])->name('papers.unpublish');
             Route::post('packs/rebuild', [Console\PackController::class, 'rebuild'])->name('packs.rebuild');
 
+            Route::get('payments', [Console\PaymentController::class, 'index'])->name('payments.index');
+            Route::get('payments/{order}', [Console\PaymentController::class, 'show'])->name('payments.show');
+            Route::get('payments/{order}/proof', [Console\PaymentController::class, 'proof'])->name('payments.proof');
+            Route::post('payments/{order}/approve', [Console\PaymentController::class, 'approve'])->name('payments.approve');
+            Route::post('payments/{order}/reject', [Console\PaymentController::class, 'reject'])->name('payments.reject');
+
+            Route::get('exams', [Console\ExamController::class, 'index'])->name('exams.index');
+            Route::post('exams', [Console\ExamController::class, 'store'])->name('exams.store');
+            Route::get('exams/{exam}', [Console\ExamController::class, 'edit'])->name('exams.edit');
+            Route::put('exams/{exam}', [Console\ExamController::class, 'update'])->name('exams.update');
+            Route::post('exams/{exam}/subjects', [Console\ExamController::class, 'attach'])->name('exams.attach');
+            Route::delete('exams/{exam}/subjects/{subject}', [Console\ExamController::class, 'detach'])->name('exams.detach');
+            Route::post('subjects', [Console\ExamController::class, 'storeSubject'])->name('subjects.store');
+
             Route::resource('posts', Console\PostController::class)->except('show');
             Route::resource('events', Console\EventController::class)->except('show');
             Route::get('settings', [Console\SettingsController::class, 'edit'])->name('settings.edit');
@@ -103,6 +119,14 @@ Route::middleware(['auth'])->group(function () {
             Route::patch('users/{user}/toggle', [Console\UserController::class, 'toggle'])->name('users.toggle');
         });
     });
+
+    // Unlocking subjects and my purchases
+    Route::get('/checkout', [Student\CheckoutController::class, 'show'])->name('checkout.show');
+    Route::post('/checkout', [Student\CheckoutController::class, 'store'])->middleware('throttle:10,1')->name('checkout.store');
+    Route::get('/orders', [Student\OrderController::class, 'index'])->name('orders.index');
+    Route::get('/orders/{reference}', [Student\OrderController::class, 'show'])->name('orders.show');
+    Route::post('/orders/{reference}/paid', [Student\OrderController::class, 'submitProof'])->middleware('throttle:10,1')->name('orders.proof');
+    Route::post('/orders/{reference}/cancel', [Student\OrderController::class, 'cancel'])->name('orders.cancel');
 
     // Student area
     Route::prefix('practice')->name('practice.')->group(function () {

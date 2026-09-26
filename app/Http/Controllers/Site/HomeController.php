@@ -27,6 +27,8 @@ class HomeController extends Controller
             'events' => Event::live()->upcoming()->orderBy('starts_on')->limit(5)->get(),
             'scholarships' => $scholarships,
             'stores' => $this->stores(),
+            'fromPrice' => \App\Services\Pricing::defaultPrice(),
+            'freeQuestions' => \App\Services\Pricing::defaultFreeQuestions(),
         ]);
     }
 

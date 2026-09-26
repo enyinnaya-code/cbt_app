@@ -23,12 +23,12 @@ class QuestionSelector
     public const PASSAGE_MAX_QUESTIONS = 10;
 
     /** Exam order is kept when one year is chosen; with "all years" whole passage groups are shuffled together. */
-    public function practice(?Exam $exam, Subject $subject, ?int $year, int $count, ?int $topicId = null, ?int $seed = null): array
+    public function practice(?Exam $exam, Subject $subject, ?int $year, int $count, ?int $topicId = null, ?int $seed = null, ?Access $access = null): array
     {
         // $exam is null when practising a topic, which spans every exam that covers the subject.
         $candidates = $this->candidates(fn ($paper) => $paper->where('subject_id', $subject->id)
             ->when($exam, fn ($q) => $q->where('exam_id', $exam->id))
-            ->when($year, fn ($q) => $q->where('year', $year)), $topicId);
+            ->when($year, fn ($q) => $q->where('year', $year)), $topicId, null, $access);
 
         return $this->pick($candidates, $count, keepOrder: $year !== null, seed: $seed);
     }
@@ -62,13 +62,49 @@ class QuestionSelector
         return $this->payload($ordered, $withKey);
     }
 
-    public function saved(User $user, int $count, ?int $seed = null): array
+    public function saved(User $user, int $count, ?int $seed = null, ?Access $access = null): array
     {
         $ids = DB::table('bookmarks')->where('user_id', $user->id)->where('is_bookmarked', true)->pluck('question_id');
 
-        $candidates = $this->candidates(fn ($paper) => $paper, null, $ids->all());
+        $candidates = $this->candidates(fn ($paper) => $paper, null, $ids->all(), $access);
 
         return $this->pick($candidates, $count, keepOrder: false, seed: $seed);
+    }
+
+    /**
+     * The free sample of a subject: the first $limit usable questions, newest year first, in paper order.
+     * Reads in small batches and stops as soon as it has enough, so it stays cheap on big subjects.
+     *
+     * @return array<int,int> question ids
+     */
+    public function freeIds(int $examId, int $subjectId, int $limit): array
+    {
+        $ids = [];
+        $offset = 0;
+        $batch = max(100, $limit * 2);
+
+        while ($limit > 0 && count($ids) < $limit) {
+            $rows = Question::query()
+                ->join('papers', 'papers.id', '=', 'questions.paper_id')
+                ->where('papers.status', 'published')->where('papers.exam_id', $examId)->where('papers.subject_id', $subjectId)
+                ->whereRaw('COALESCE(questions.not_question, 0) = 0')
+                ->orderByDesc('papers.year')->orderBy('papers.id')->orderBy('questions.id')
+                ->select('questions.id', 'questions.answer', 'questions.options')
+                ->offset($offset)->limit($batch)->get();
+
+            if ($rows->isEmpty()) { break; }
+
+            foreach ($rows as $row) {
+                if ($this->usable($row)) {
+                    $ids[] = (int) $row->id;
+                    if (count($ids) >= $limit) { break; }
+                }
+            }
+
+            $offset += $batch;
+        }
+
+        return $ids;
     }
 
     /** How many usable questions each subject has for an exam, so the setup screen can show what is available. */
@@ -94,17 +130,17 @@ class QuestionSelector
     // ---------------------------------------------------------------------------------------------
 
     /** @return Collection<int, Question> usable multiple-choice questions in exam order, each with ->passage_id set */
-    private function candidates(callable $paperScope, ?int $topicId = null, ?array $onlyIds = null): Collection
+    private function candidates(callable $paperScope, ?int $topicId = null, ?array $onlyIds = null, ?Access $access = null): Collection
     {
         $questions = Question::query()
             ->whereHas('paper', fn ($p) => $paperScope($p->published()))
             ->whereRaw('COALESCE(questions.not_question, 0) = 0')
             ->when($topicId, fn ($q) => $q->where('topic_id', $topicId))
             ->when($onlyIds !== null, fn ($q) => $q->whereIn('id', $onlyIds ?: [0]))
-            ->with(['topic:id,name', 'paper:id,year'])
+            ->with(['topic:id,name', 'paper:id,year,exam_id,subject_id'])
             ->orderBy('paper_id')->orderBy('id')
             ->get()
-            ->filter(fn (Question $q) => $this->usable($q))
+            ->filter(fn (Question $q) => $this->usable($q) && ($access === null || $access->allowsQuestion($q)))
             ->values();
 
         $map = $this->passageMap($questions->pluck('paper_id')->unique()->all());

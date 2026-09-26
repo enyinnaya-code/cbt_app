@@ -17,6 +17,8 @@
             ['Packs', 'console.packs.index', 'download', 'console.packs.*'],
             ...($legacyCount ? [['Old tests', 'console.legacy.index', 'refresh', 'console.legacy.*']] : []),
             ...($user->isAdmin() ? [
+                ['Payments', 'console.payments.index', 'card', 'console.payments.*'],
+                ['Exams', 'console.exams.index', 'target', 'console.exams.*'],
                 ['Content', 'console.posts.index', 'news', ['console.posts.*', 'console.events.*', 'console.settings.*']],
                 ['Users', 'console.users.index', 'users', 'console.users.*'],
             ] : []),
@@ -63,6 +65,7 @@
                     @if(Route::has('profile'))
                         <a href="{{ route('profile') }}"><x-icon name="user" size="s"/>Profile and settings</a>
                     @endif
+                    @unless($isStaff)<a href="{{ route('orders.index') }}"><x-icon name="card" size="s"/>My purchases</a>@endunless
                     <div class="seg" data-theme-group style="margin:6px 0">
                         <button type="button" data-theme-val="light"><x-icon name="sun" size="s"/>&nbsp;Light</button>
                         <button type="button" data-theme-val="dark"><x-icon name="moon" size="s"/>&nbsp;Dark</button>

@@ -4,7 +4,11 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CatalogController;
 use App\Http\Controllers\Api\V1\PackController;
 use App\Http\Controllers\Api\V1\SyncController;
+use App\Http\Controllers\Webhooks\PaystackController;
 use Illuminate\Support\Facades\Route;
+
+// Paystack tells us about payments here (https://testacbt.com/api/webhooks/paystack). Verified by signature, not by sign-in.
+Route::post('/webhooks/paystack', PaystackController::class);
 
 // Mobile app API. Base URL: /api/v1
 Route::prefix('v1')->group(function () {

@@ -89,6 +89,14 @@
     </div>
 </section>
 
+<section class="section" id="pricing">
+    <div class="card row between wrap" style="padding:28px;gap:20px">
+        <div class="stack" style="gap:6px"><span class="eyebrow">Simple pricing</span><h2 class="h1" style="font-size:clamp(24px,3.4vw,32px)">Free to start. Pay only for what you need.</h2>
+            <p class="muted" style="max-width:58ch">Try {{ $freeQuestions }} questions in every subject for free. Unlock a whole subject from {{ \App\Services\Pricing::naira($fromPrice) }}, by card or bank transfer. No subscription.</p></div>
+        <a class="btn btn-p" href="{{ route('pricing') }}">See pricing</a>
+    </div>
+</section>
+
 <section class="section" id="download">
     <div class="app-band">
         <div class="stack" style="gap:16px">

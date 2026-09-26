@@ -15,7 +15,7 @@ class Subject extends Model
 
     public function exams()
     {
-        return $this->belongsToMany(Exam::class, 'exam_subject')->withPivot('display_name');
+        return $this->belongsToMany(Exam::class, 'exam_subject')->withPivot('display_name', 'price', 'free_questions');
     }
 
     public function topics()

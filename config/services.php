@@ -33,6 +33,12 @@ return [
         'client_ids' => array_values(array_filter(array_map('trim', explode(',', (string) env('GOOGLE_CLIENT_IDS', ''))))),
     ],
 
+    // Paystack (card, bank and USSD payments). Keys come from the Paystack dashboard, Settings > API Keys.
+    'paystack' => [
+        'secret' => env('PAYSTACK_SECRET_KEY'),
+        'base_url' => env('PAYSTACK_BASE_URL', 'https://api.paystack.co'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
