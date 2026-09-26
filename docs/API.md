@@ -36,10 +36,26 @@ Staff accounts (admin/examiner) are never linked automatically (`403`).
               "url": "https://.../api/v1/packs/jamb/english-language" } } ] } ] }
 ```
 
+Every subject also says what this student may use:
+
+| Field | Meaning |
+|---|---|
+| `access` | `full` (unlocked, or a free subject, or staff) or `free` (only the free sample) |
+| `price` | naira to unlock it (0 = free subject) |
+| `free_questions` | size of the free sample |
+| `expires_at` | when a purchase ends (`null` when not bought) |
+| `full_question_count` | how many questions unlocking gives ("Unlock all 1,200 questions") |
+| `pack.tier` | `full` or `free`: which pack `pack` describes. A locked subject offers the small free pack |
+
+The catalog top level also has `urls.pricing` and `urls.checkout` (web pages where the student unlocks subjects) and each exam has `bundle_price`.
+A pack's `tier` is also inside the pack file. After a purchase the catalog changes (new `access`, `pack.tier = full`), so refresh it and
+download again; the full pack replaces the free one. Version numbers count separately for each tier, so compare `tier` as well as `version`.
+The server also refuses `POST /sync/progress` answers and bookmarks for questions the student has not unlocked (they count as `rejected`).
+
 Show `size_bytes` before the student downloads. The response has an `ETag`; send it back as `If-None-Match` and an unchanged
 catalog costs a bodyless `304`. Compare `pack.version` with the stored version to know when to re-download.
 
-`GET /packs/{exam}/{subject}` downloads `application/gzip` (a gzipped JSON file). Headers: `X-Pack-Version`, `X-Pack-Sha256`.
+`GET /packs/{exam}/{subject}` downloads `application/gzip` (a gzipped JSON file). Headers: `X-Pack-Version`, `X-Pack-Tier`, `X-Pack-Sha256`. The server picks the tier from the student's access.
 Verify the SHA-256 of the downloaded bytes against the catalog before unzipping. It supports `Range` requests, so an interrupted
 download can resume from the byte it stopped at. The app stores it in SQLite; nothing else is needed offline.
 

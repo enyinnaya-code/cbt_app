@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Console;
 use App\Http\Controllers\Controller;
 use App\Models\Exam;
 use App\Models\Subject;
+use App\Services\PackBuilder;
 use App\Services\Pricing;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -49,7 +50,7 @@ class ExamController extends Controller
     }
 
     /** Name, visibility, bundle price, and each subject's display name, price and free questions, in one save. */
-    public function update(Request $request, Exam $exam)
+    public function update(Request $request, Exam $exam, PackBuilder $packs)
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:60', Rule::unique('exams', 'name')->ignore($exam->id)],
@@ -64,6 +65,8 @@ class ExamController extends Controller
             '*.integer' => 'Prices and counts must be whole numbers, for example 1500.',
             '*.min' => 'Prices and counts cannot be negative.',
         ]);
+
+        $before = $exam->subjects()->get()->mapWithKeys(fn ($s) => [$s->id => [$s->pivot->price, $s->pivot->free_questions]])->all();
 
         DB::transaction(function () use ($exam, $data) {
             // The slug never changes: the mobile app and offline packs identify the exam by it.
@@ -86,6 +89,13 @@ class ExamController extends Controller
                 ]);
             }
         });
+
+        // The free sample that goes into the offline packs follows the price and the free-question count.
+        foreach ($exam->subjects()->get() as $subject) {
+            if ($before[$subject->id] !== [$subject->pivot->price, $subject->pivot->free_questions]) {
+                $packs->buildFree($exam, $subject);
+            }
+        }
 
         return back()->with('success', 'Saved.');
     }

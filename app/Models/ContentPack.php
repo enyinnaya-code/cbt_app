@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class ContentPack extends Model
 {
     protected $fillable = [
-        'exam_id', 'subject_id', 'version', 'is_current', 'path', 'size_bytes', 'sha256',
+        'exam_id', 'subject_id', 'tier', 'version', 'is_current', 'path', 'size_bytes', 'sha256',
         'content_hash', 'paper_count', 'question_count', 'years', 'built_at',
     ];
 
@@ -30,8 +30,17 @@ class ContentPack extends Model
         return $this->belongsTo(Subject::class);
     }
 
+    public const FULL = 'full';
+    public const FREE = 'free';
+
+    /** The latest pack of each kind. The console and the reports below count only the full ones. */
     public function scopeCurrent($query)
     {
         return $query->where('is_current', true);
+    }
+
+    public function scopeTier($query, string $tier)
+    {
+        return $query->where('tier', $tier);
     }
 }

@@ -15,7 +15,7 @@ class PackController extends Controller
     /** Every exam + subject that has published papers or a current pack, and how the pack stands. */
     public function index()
     {
-        $current = ContentPack::current()->get()->keyBy(fn ($p) => $p->exam_id . '-' . $p->subject_id);
+        $current = ContentPack::current()->tier(ContentPack::FULL)->get()->keyBy(fn ($p) => $p->exam_id . '-' . $p->subject_id);
 
         $published = Paper::published()->select('exam_id', 'subject_id')->distinct()->get()
             ->mapWithKeys(fn ($p) => [$p->exam_id . '-' . $p->subject_id => $p]);

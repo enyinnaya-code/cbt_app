@@ -3,7 +3,11 @@
 namespace App\Http\Controllers\Console;
 
 use App\Http\Controllers\Controller;
+use App\Models\ContentPack;
+use App\Models\Exam;
 use App\Models\Setting;
+use App\Models\Subject;
+use App\Services\PackBuilder;
 use Illuminate\Http\Request;
 
 /** Site-wide settings an admin can change without a developer. */
@@ -33,7 +37,7 @@ class SettingsController extends Controller
         ]);
     }
 
-    public function update(Request $request)
+    public function update(Request $request, PackBuilder $packs)
     {
         // Form names use underscores (dots are awkward in HTML); map them back to the setting keys.
         $rules = [];
@@ -44,7 +48,18 @@ class SettingsController extends Controller
             'bank_account_number.regex' => 'The account number can only contain digits.',
         ]);
 
+        $pricingBefore = [Setting::get('pricing.default_price'), Setting::get('pricing.free_questions')];
+
         Setting::put(collect(self::FIELDS)->mapWithKeys(fn ($rule, $key) => [$key => $data[str_replace('.', '_', $key)] ?? null])->all());
+
+        // The default price and free-question count decide what goes into the free offline packs.
+        if ($pricingBefore !== [Setting::get('pricing.default_price'), Setting::get('pricing.free_questions')]) {
+            foreach (ContentPack::current()->tier(ContentPack::FULL)->get(['exam_id', 'subject_id']) as $pair) {
+                $exam = Exam::find($pair->exam_id);
+                $subject = Subject::find($pair->subject_id);
+                if ($exam && $subject) { $packs->buildFree($exam, $subject); }
+            }
+        }
 
         return back()->with('success', 'Settings saved.');
     }

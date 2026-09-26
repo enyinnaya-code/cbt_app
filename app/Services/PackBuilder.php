@@ -12,11 +12,14 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * Builds the downloadable offline packs: one gzip-compressed JSON file per exam + subject,
- * containing every published paper. A new version is only written when the content changed.
+ * Builds the downloadable offline packs: for each exam + subject, one gzip-compressed JSON file with every published
+ * paper (the "full" pack) and a small one with only the free sample (the "free" pack, for students who have not
+ * unlocked the subject). A new version is only written when the content changed.
  */
 class PackBuilder
 {
+    public function __construct(private QuestionSelector $selector) {}
+
     public const FORMAT = 1;
     private const MAX_INLINE_IMAGE_BYTES = 300 * 1024;
     private const IMAGE_TYPES = ['png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'gif' => 'image/gif', 'webp' => 'image/webp'];
@@ -25,20 +28,60 @@ class PackBuilder
     public array $stats = [];
 
     /**
+     * Builds the full pack and then the free one. The result describes the full pack.
+     *
      * @return array{status:string, pack:?ContentPack, warnings:array<int,string>}
      */
     public function build(Exam $exam, Subject $subject, bool $force = false): array
     {
-        $this->stats = ['skipped_no_answer' => 0, 'images_inlined' => 0, 'images_missing' => 0, 'images_too_big' => 0];
+        $papers = $this->papers($exam, $subject);
 
-        $papers = Paper::published()
+        $result = $this->publish($exam, $subject, ContentPack::FULL, $papers, null, $force);
+        $this->publishFree($exam, $subject, $papers, $force);
+
+        return $result;
+    }
+
+    /** Rebuilds only the free pack. Used when a price or the number of free questions changes. */
+    public function buildFree(Exam $exam, Subject $subject, bool $force = false): string
+    {
+        return $this->publishFree($exam, $subject, $this->papers($exam, $subject), $force);
+    }
+
+    /** @return \Illuminate\Support\Collection<int, Paper> */
+    private function papers(Exam $exam, Subject $subject)
+    {
+        return Paper::published()
             ->where('exam_id', $exam->id)->where('subject_id', $subject->id)
             ->whereHas('questions')
             ->orderByDesc('year')->orderBy('id')
             ->with(['questions' => fn ($q) => $q->orderBy('id')])
             ->get();
+    }
 
-        $current = ContentPack::current()->where('exam_id', $exam->id)->where('subject_id', $subject->id)->first();
+    /** The free pack exists only while the subject is paid and has a free sample to give. */
+    private function publishFree(Exam $exam, Subject $subject, $papers, bool $force): string
+    {
+        $pivot = Pricing::pivot($exam, $subject);
+        $limit = Pricing::freeQuestions($pivot);
+        $free = (Pricing::price($pivot) > 0 && $limit > 0 && $papers->isNotEmpty())
+            ? $this->selector->freeIds($exam->id, $subject->id, $limit)
+            : [];
+
+        return $this->publish($exam, $subject, ContentPack::FREE, $free ? $papers : collect(), $free, $force)['status'];
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, Paper>  $papers
+     * @param  array<int,int>|null  $onlyIds  for the free pack: the ids of the questions to include
+     * @return array{status:string, pack:?ContentPack, warnings:array<int,string>}
+     */
+    private function publish(Exam $exam, Subject $subject, string $tier, $papers, ?array $onlyIds, bool $force): array
+    {
+        $this->stats = ['skipped_no_answer' => 0, 'images_inlined' => 0, 'images_missing' => 0, 'images_too_big' => 0];
+
+        $current = ContentPack::current()->tier($tier)->where('exam_id', $exam->id)->where('subject_id', $subject->id)->first();
+        $wanted = $onlyIds === null ? null : array_flip($onlyIds);
 
         if ($papers->isEmpty()) {
             // Nothing published any more: retire the pack so it leaves the catalog.
@@ -52,11 +95,20 @@ class PackBuilder
         $display = $exam->subjects()->whereKey($subject->id)->first()?->pivot->display_name;
         $topicIds = [];
 
-        $paperData = $papers->map(function (Paper $paper) use (&$topicIds) {
+        $paperData = $papers->map(function (Paper $paper) use (&$topicIds, $wanted) {
             $items = [];
+            $pending = null;   // the latest passage or instruction, kept only if a question after it is kept
+
             foreach ($paper->questions as $q) {
                 $item = $this->item($q);
                 if ($item === null) { continue; }
+
+                if ($wanted !== null) {
+                    if ($item['type'] === 'instruction') { $pending = $item; continue; }
+                    if (! isset($wanted[$item['id']])) { continue; }
+                    if ($pending !== null) { $items[] = $pending; $pending = null; }
+                }
+
                 if (! empty($item['topic_id'])) { $topicIds[$item['topic_id']] = true; }
                 $items[] = $item;
             }
@@ -84,21 +136,22 @@ class PackBuilder
             return ['status' => 'unchanged', 'pack' => $current, 'warnings' => $this->warnings()];
         }
 
-        $version = ((int) ContentPack::where('exam_id', $exam->id)->where('subject_id', $subject->id)->max('version')) + 1;
-        $payload = ['format' => self::FORMAT, 'version' => $version, 'generated_at' => now()->toIso8601String()] + $content;
+        $version = ((int) ContentPack::tier($tier)->where('exam_id', $exam->id)->where('subject_id', $subject->id)->max('version')) + 1;
+        $payload = ['format' => self::FORMAT, 'tier' => $tier, 'version' => $version, 'generated_at' => now()->toIso8601String()] + $content;
         $gz = gzencode($this->encode($payload), 9);
 
-        $path = "packs/{$exam->slug}-{$subject->slug}-v{$version}.json.gz";
+        $path = "packs/{$exam->slug}-{$subject->slug}" . ($tier === ContentPack::FULL ? '' : "-{$tier}") . "-v{$version}.json.gz";
         Storage::disk('local')->put($path, $gz);
 
         $questionCount = $paperData->sum(fn ($p) => collect($p['items'])->where('type', 'mcq')->count());
 
-        $pack = DB::transaction(function () use ($exam, $subject, $version, $path, $gz, $contentHash, $paperData, $questionCount) {
-            ContentPack::where('exam_id', $exam->id)->where('subject_id', $subject->id)->update(['is_current' => false]);
+        $pack = DB::transaction(function () use ($exam, $subject, $tier, $version, $path, $gz, $contentHash, $paperData, $questionCount) {
+            ContentPack::tier($tier)->where('exam_id', $exam->id)->where('subject_id', $subject->id)->update(['is_current' => false]);
 
             return ContentPack::create([
                 'exam_id' => $exam->id,
                 'subject_id' => $subject->id,
+                'tier' => $tier,
                 'version' => $version,
                 'is_current' => true,
                 'path' => $path,
@@ -112,15 +165,15 @@ class PackBuilder
             ]);
         });
 
-        $this->prune($exam, $subject);
+        $this->prune($exam, $subject, $tier);
 
         return ['status' => 'built', 'pack' => $pack, 'warnings' => $this->warnings()];
     }
 
     /** Keep the current and previous version on disk (a phone may still be mid-download); delete the rest. */
-    private function prune(Exam $exam, Subject $subject): void
+    private function prune(Exam $exam, Subject $subject, string $tier): void
     {
-        $old = ContentPack::where('exam_id', $exam->id)->where('subject_id', $subject->id)
+        $old = ContentPack::tier($tier)->where('exam_id', $exam->id)->where('subject_id', $subject->id)
             ->orderByDesc('version')->get()->slice(2);
 
         foreach ($old as $pack) {

@@ -24,7 +24,7 @@ class OverviewController extends Controller
             'liveQuestions' => (clone $usableQuestions)->whereHas('paper', fn ($p) => $p->published())->count(),
             'students' => User::where('role', User::ROLE_STUDENT)->count(),
             'newStudents' => User::where('role', User::ROLE_STUDENT)->where('created_at', '>=', now()->subDays(7))->count(),
-            'packs' => ContentPack::current()->count(),
+            'packs' => ContentPack::current()->tier(ContentPack::FULL)->count(),
             'legacy' => $user->isAdmin() ? $tagger->untaggedCount() : 0,
             'drafts' => Paper::where('status', Paper::DRAFT)->with(['exam:id,name', 'subject:id,name'])
                 ->withCount(['questions as question_count' => fn ($q) => $q->whereRaw('COALESCE(not_question, 0) = 0')])
