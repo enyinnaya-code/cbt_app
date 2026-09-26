@@ -11,8 +11,13 @@
             <p class="muted" style="font-size:18px;max-width:52ch">Practise real past questions for WAEC, NECO, JAMB, Post-UTME and IGCSE, see the right answer straight away, and read a simple explanation in English or Pidgin. Works offline on the app.</p>
         </div>
         <div class="row wrap">
-            <a class="btn btn-p" href="{{ route('register') }}">Get started, it is free</a>
-            <a class="btn btn-o" href="{{ route('login') }}">I already have an account</a>
+            @auth
+                <a class="btn btn-p" href="{{ route('dashboard') }}">Go to my dashboard</a>
+                <a class="btn btn-o" href="{{ route('practice.index') }}">Start practising</a>
+            @else
+                <a class="btn btn-p" href="{{ route('register') }}">Get started, it is free</a>
+                <a class="btn btn-o" href="{{ route('login') }}">I already have an account</a>
+            @endauth
         </div>
         @if($exams->isNotEmpty())
             <div class="exam-strip">@foreach($exams as $exam)<a href="{{ route('register') }}">{{ $exam->name }}</a>@endforeach</div>

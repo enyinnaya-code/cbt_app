@@ -62,6 +62,7 @@
                 </button>
                 <div class="usermenu-panel">
                     <div class="who"><p class="h3">{{ $user->name }}</p><p class="small muted">{{ $user->email }}</p></div>
+                    <a href="{{ route('welcome') }}"><x-icon name="globe" size="s"/>Back to the website</a>
                     @if(Route::has('profile'))
                         <a href="{{ route('profile') }}"><x-icon name="user" size="s"/>Profile and settings</a>
                     @endif

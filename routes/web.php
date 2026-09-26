@@ -23,8 +23,10 @@ use App\Http\Controllers\Site;
 
 
 
+// The landing page is open to everyone: a signed-in student can come back to it and go back to their account from it.
+Route::get('/', [Site\HomeController::class, 'index'])->name('welcome');
+
 Route::middleware('guest')->group(function () {
-    Route::get('/', [Site\HomeController::class, 'index'])->name('welcome');
     Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
 });
 
