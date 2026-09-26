@@ -4,7 +4,7 @@ import type { Db } from './types';
  * Versioned migrations, run on every start. PRAGMA user_version remembers how far this phone has got, so an
  * app update only applies what is new and never touches a student's progress.
  */
-const MIGRATIONS: string[] = [
+export const MIGRATIONS: string[] = [
   // 1: everything the first release needs
   `
   CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -70,6 +70,12 @@ const MIGRATIONS: string[] = [
     installed_at TEXT NOT NULL,
     PRIMARY KEY (exam_slug, subject_slug)
   );
+  `,
+
+  // 2: a pack is either the full one or the free sample; the sample is replaced by the full pack after a purchase
+  `
+  ALTER TABLE packs ADD COLUMN tier TEXT NOT NULL DEFAULT 'full';
+  UPDATE packs SET tier = 'free' WHERE starter = 1;
   `,
 ];
 

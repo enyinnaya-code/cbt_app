@@ -64,7 +64,7 @@ export default function Downloads() {
               <View style={{ flex: 1, gap: 4 }}>
                 <T variant="h3">{s.examName} {s.name}</T>
                 <T variant="small" muted>
-                  {s.installed?.starter ? 'Sample questions' : `${s.installed?.years.length ? `${Math.min(...s.installed.years)} to ${Math.max(...s.installed.years)}, ` : ''}${formatBytes(s.installed?.size_bytes ?? 0)}`}
+                  {s.installed?.starter ? 'Sample questions' : `${s.installed?.tier === 'free' ? 'Free sample, ' : ''}${s.installed?.years.length ? `${Math.min(...s.installed.years)} to ${Math.max(...s.installed.years)}, ` : ''}${formatBytes(s.installed?.size_bytes ?? 0)}`}
                 </T>
                 {dl && !dl.error ? <ProgressBar value={dl.total ? (dl.done / dl.total) * 100 : 0} /> : null}
                 {dl?.error ? <T variant="small" color={c.danger}>{dl.error}</T> : null}
@@ -72,7 +72,7 @@ export default function Downloads() {
               {dl && !dl.error ? (
                 <IconButton icon="x" label="Cancel download" onPress={() => cancel(packKey(s.examSlug, s.slug))} />
               ) : s.updateAvailable ? (
-                <Badge label="Update" />
+                <Badge label={s.installed?.tier === 'free' && !s.locked ? 'Unlocked' : 'Update'} kind={s.installed?.tier === 'free' && !s.locked ? 'green' : 'amber'} />
               ) : null}
               {!dl || dl.error ? <IconButton icon="trash" label={`Delete ${s.name}`} onPress={() => confirmDelete(s, () => void remove(s.examSlug, s.slug))} /> : null}
             </Row>
@@ -95,7 +95,7 @@ export default function Downloads() {
                   ) : dl?.error ? (
                     <T variant="small" color={c.danger}>{dl.error}</T>
                   ) : (
-                    <T variant="small" muted>{s.offered ? `${s.offered.question_count} questions · ${formatBytes(s.downloadBytes)}` : ''}</T>
+                    <T variant="small" muted>{s.offered ? `${s.locked ? 'Free sample · ' : ''}${s.offered.question_count} questions · ${formatBytes(s.downloadBytes)}` : ''}</T>
                   )}
                 </View>
                 {dl && !dl.error ? (

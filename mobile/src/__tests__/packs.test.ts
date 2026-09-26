@@ -140,6 +140,30 @@ describe('PackManager.installFromText', () => {
     expect((await m.meta('jamb', 'physics'))?.starter).toBe(false);
   });
 
+  it('records which tier a pack is, and treats the bundled starter as a sample', async () => {
+    const m = build();
+
+    await m.installFromText(JSON.stringify({ ...physics(), tier: 'free' }));
+    expect((await m.meta('jamb', 'physics'))?.tier).toBe('free');
+
+    await m.installFromText(JSON.stringify({ ...physics(), tier: 'full' }));
+    expect((await m.meta('jamb', 'physics'))?.tier).toBe('full');
+
+    await m.installFromText(JSON.stringify(physics()));
+    expect((await m.meta('jamb', 'physics'))?.tier).toBe('full');   // packs from before samples existed have no tier
+
+    await m.installFromText(JSON.stringify(physics()), { starter: true });
+    expect((await m.meta('jamb', 'physics'))?.tier).toBe('free');
+  });
+
+  it('offers the other tier as an update even when its version number is lower', async () => {
+    const m = build();
+    await m.installFromText(JSON.stringify({ ...physics(), tier: 'free', version: 7 }));
+    const unlocked = subject(4, 'physics', { pack: { tier: 'full', version: 2, size_bytes: 1, sha256: 'a', paper_count: 1, question_count: 1, years: [], built_at: '', url: '/x' } });
+
+    expect((await m.updatesAvailable('jamb', [unlocked])).map((s) => s.slug)).toEqual(['physics']);
+  });
+
   it('gives topic names to answers restored from the server, which only knew the ids', async () => {
     await recordAttempt(db, { uuid: 'r', questionId: 1, examId: 3, examSlug: 'jamb', subjectId: 4, subjectSlug: 'physics', subjectName: 'Physics', year: 2019, topicId: 7, topicName: null, mode: 'practice', selected: 'B', isCorrect: true, timeMs: null, answeredAt: '2026-09-26T10:00:00.000Z', synced: true });
 

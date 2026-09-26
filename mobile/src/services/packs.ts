@@ -4,7 +4,8 @@
  */
 import { gunzipSync, strFromU8 } from 'fflate';
 import type { Db } from '@/db/types';
-import type { CatalogSubject, Pack } from '@/core/types';
+import type { CatalogSubject, Pack, PackTier } from '@/core/types';
+import { needsReplacing } from '@/core/views';
 import type { Api } from './api';
 
 export interface PackMeta {
@@ -14,6 +15,8 @@ export interface PackMeta {
   subject_name: string;
   /** The exam's own name for the subject (JAMB says "Use of English"). */
   display_name: string;
+  /** "full" has every question; "free" is the sample (the starter questions count as a sample). */
+  tier: PackTier;
   version: number;
   sha256: string | null;
   size_bytes: number;
@@ -49,7 +52,7 @@ export class PackError extends Error {
 export const SUPPORTED_FORMAT = 1;
 
 interface Row {
-  exam_slug: string; subject_slug: string; exam_name: string; subject_name: string; display_name: string; version: number; sha256: string | null; size_bytes: number;
+  exam_slug: string; subject_slug: string; exam_name: string; subject_name: string; display_name: string; tier: PackTier; version: number; sha256: string | null; size_bytes: number;
   question_count: number; paper_count: number; years: string; starter: number; installed_at: string;
 }
 
@@ -140,15 +143,15 @@ export class PackManager {
 
     const meta: PackMeta = {
       exam_slug: pack.exam.slug, subject_slug: pack.subject.slug, exam_name: pack.exam.name, subject_name: pack.subject.name,
-      display_name: pack.subject.display_name || pack.subject.name, version: pack.version, sha256: o.sha256 ?? null,
+      display_name: pack.subject.display_name || pack.subject.name, tier: o.starter || pack.tier === 'free' ? 'free' : 'full', version: pack.version, sha256: o.sha256 ?? null,
       size_bytes: o.size ?? text.length, question_count: questions, paper_count: pack.papers.length,
       years: [...years].sort((a, b) => b - a), starter: !!o.starter, installed_at: this.now().toISOString(),
     };
 
     await this.db.runAsync(
-      `INSERT OR REPLACE INTO packs (exam_slug, subject_slug, exam_name, subject_name, display_name, version, sha256, size_bytes, question_count, paper_count, years, starter, installed_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [meta.exam_slug, meta.subject_slug, meta.exam_name, meta.subject_name, meta.display_name, meta.version, meta.sha256, meta.size_bytes, meta.question_count, meta.paper_count, JSON.stringify(meta.years), meta.starter ? 1 : 0, meta.installed_at],
+      `INSERT OR REPLACE INTO packs (exam_slug, subject_slug, exam_name, subject_name, display_name, tier, version, sha256, size_bytes, question_count, paper_count, years, starter, installed_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [meta.exam_slug, meta.subject_slug, meta.exam_name, meta.subject_name, meta.display_name, meta.tier, meta.version, meta.sha256, meta.size_bytes, meta.question_count, meta.paper_count, JSON.stringify(meta.years), meta.starter ? 1 : 0, meta.installed_at],
     );
 
     // Answers restored from the server know their topic id but not its name; the pack knows the names.
@@ -184,12 +187,15 @@ export class PackManager {
     this.cache.delete(`${examSlug}/${subjectSlug}`);
   }
 
-  /** Subjects whose catalog pack is newer than the installed one (a starter pack always counts as out of date). */
+  /**
+   * Subjects whose catalog pack should replace the installed one: it is newer, it is the other tier (a purchase
+   * unlocked the subject, or ran out), or the installed one is the bundled starter (always out of date).
+   */
   async updatesAvailable(examSlug: string, subjects: CatalogSubject[]): Promise<CatalogSubject[]> {
     const out: CatalogSubject[] = [];
     for (const s of subjects) {
       const m = await this.meta(examSlug, s.slug);
-      if (m && s.pack && (m.starter || s.pack.version > m.version)) out.push(s);
+      if (m && s.pack && needsReplacing(m, s.pack)) out.push(s);
     }
     return out;
   }

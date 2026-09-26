@@ -12,6 +12,7 @@ import { useSettings } from '@/state/settings';
 import { Avatar, Badge, Banner, Button, Card, Chip, Field, Row, Screen, Segmented, T } from '@/ui/components';
 import { Icon, type IconName } from '@/ui/Icon';
 import { useTheme } from '@/ui/theme';
+import { unlockOnWebsite } from '@/ui/unlock';
 
 export default function Profile() {
   const { c } = useTheme();
@@ -115,6 +116,7 @@ export default function Profile() {
       <View>
         <Row2 icon="bookmark" title="Saved questions" onPress={() => router.push('/saved')} />
         <Row2 icon="download" title="Manage downloads" onPress={() => router.push('/downloads')} />
+        <Row2 icon="card" title="Unlock subjects and purchases" onPress={() => void unlockOnWebsite({ page: '/orders' })} />
       </View>
 
       <Badge label={`TestaCBT ${require('../../../app.json').expo.version}`} kind="neutral" />

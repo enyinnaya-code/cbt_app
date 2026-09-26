@@ -33,6 +33,7 @@ const PATHS = {
   play: 'M7 4l13 8-13 8z',
   help: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9a2.5 2.5 0 0 1 5 .5c0 1.5-2.5 2-2.5 3.5M12 17h.01',
   plus: 'M12 5v14M5 12h14',
+  card: 'M3 6h18v12H3zM3 10h18M6 15h4',
   refresh: 'M20 11a8 8 0 0 0-14-4M4 4v4h4M4 13a8 8 0 0 0 14 4M20 20v-4h-4',
 } as const;
 

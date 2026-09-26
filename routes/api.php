@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CatalogController;
+use App\Http\Controllers\Api\V1\HandoffController;
 use App\Http\Controllers\Api\V1\PackController;
 use App\Http\Controllers\Api\V1\SyncController;
 use App\Http\Controllers\Webhooks\PaystackController;
@@ -26,6 +27,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/auth/logout', [AuthController::class, 'logout']);
 
         Route::get('/catalog', [CatalogController::class, 'index']);
+        Route::post('/web-link', [HandoffController::class, 'link'])->middleware('throttle:10,1');
         Route::get('/packs/{exam}/{subject}', [PackController::class, 'show']);
 
         Route::post('/sync/progress', [SyncController::class, 'push']);

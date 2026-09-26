@@ -47,9 +47,12 @@ export function useBackgroundWork(active: boolean) {
     const { online } = useData.getState();
     if (!online || useSession.getState().status !== 'in') return;
 
-    // At most once a minute: cheap on data and on a small battery.
-    if (Date.now() - last.current < 60000) return;
+    // At most once a minute: cheap on data and on a small battery. Coming back from the unlock page is the exception:
+    // the student is waiting to see what they bought.
+    const waiting = useData.getState().awaitingPurchase;
+    if (!waiting && Date.now() - last.current < 60000) return;
     last.current = Date.now();
+    if (waiting) useData.getState().setAwaitingPurchase(false);
 
     await useData.getState().refreshCatalogNow();
     if (!useSession.getState().needsReauth) await useData.getState().syncNow();

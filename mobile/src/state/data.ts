@@ -9,6 +9,7 @@ import { ApiError } from '@/services/api';
 import { CatalogIndex, cachedCatalog, refreshCatalog } from '@/services/catalog';
 import { PackError, type PackMeta } from '@/services/packs';
 import { services } from './services';
+import { useSettings } from './settings';
 
 export interface DownloadState {
   done: number;
@@ -26,7 +27,11 @@ interface DataState {
   syncing: boolean;
   lastSyncedAt: string | null;
   pending: number;
+  /** The student went to the website to unlock something: refresh the catalog as soon as they are back. */
+  awaitingPurchase: boolean;
 
+  setAwaitingPurchase: (v: boolean) => void;
+  syncTiers: () => Promise<void>;
   loadFromPhone: () => Promise<void>;
   refreshCatalogNow: () => Promise<void>;
   refreshInstalled: () => Promise<void>;
@@ -51,6 +56,11 @@ export const useData = create<DataState>((set, get) => ({
   syncing: false,
   lastSyncedAt: null,
   pending: 0,
+  awaitingPurchase: false,
+
+  setAwaitingPurchase(v) {
+    set({ awaitingPurchase: v });
+  },
 
   async loadFromPhone() {
     const { db, packs } = services();
@@ -65,8 +75,27 @@ export const useData = create<DataState>((set, get) => ({
     try {
       const { catalog } = await refreshCatalog(db, api);
       set({ catalog, index: new CatalogIndex(catalog) });
+      void get().syncTiers();
     } catch {
       // Offline or a server hiccup: keep using what is on the phone.
+    }
+  },
+
+  /**
+   * Keeps each downloaded subject in step with what the student may use: after a purchase the free sample is replaced
+   * by the full pack, and when a purchase runs out the full pack goes back to the sample. Respects "Wi-Fi only".
+   */
+  async syncTiers() {
+    const { catalog, online, onWifi } = get();
+    if (!catalog || !online) return;
+    if (useSettings.getState().wifiOnly && !onWifi) return;
+
+    const installed = await services().packs.installed();
+    for (const exam of catalog.exams) {
+      for (const subject of exam.subjects) {
+        const have = installed.find((i) => i.exam_slug === exam.slug && i.subject_slug === subject.slug);
+        if (have && !have.starter && subject.pack && (subject.pack.tier ?? 'full') !== have.tier) void get().download(exam.slug, subject);
+      }
     }
   },
 

@@ -29,6 +29,12 @@ npx expo-doctor
 
 Expo Go can run everything except Google sign-in. Google sign-in needs a development build (`eas build --profile development`).
 
+## Free sample and unlocking
+
+Every subject has a small free pack (about 30 questions). The full pack comes after the student unlocks the subject on the website (card or bank transfer). The app never takes payment itself: **Unlock** asks the server for a one-time signed-in link (`POST /web-link`) and opens it in the browser, so students who joined with Google can pay too. When they return, the catalog is refreshed at once and the free pack is replaced by the full one (and back again if a purchase runs out). Mock exams need a full pack. Packs of the two kinds are numbered separately, so the app compares the `tier` as well as the `version` (`needsReplacing` in `src/core/views.ts`).
+
+Before a store release, check Google Play's and Apple's rules on selling digital content: apps that unlock content usually must use the stores' own billing, or be allowed a link out to the website in your region.
+
 ## How it is built
 
 | Folder | Purpose |

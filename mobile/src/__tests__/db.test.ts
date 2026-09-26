@@ -1,5 +1,5 @@
 import * as P from '@/db/progress';
-import { migrate, SCHEMA_VERSION } from '@/db/schema';
+import { migrate, MIGRATIONS, SCHEMA_VERSION } from '@/db/schema';
 import type { Db } from '@/db/types';
 import { memoryDb, rawDb } from './helpers/sqlite';
 
@@ -21,6 +21,21 @@ describe('migrations', () => {
     expect((await fresh.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version).toBe(SCHEMA_VERSION);
     const tables = (await fresh.getAllAsync<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")).map((t) => t.name);
     expect(tables).toEqual(expect.arrayContaining(['attempts', 'bookmarks', 'kv', 'mock_runs', 'mocks', 'packs']));
+  });
+
+  it('upgrade a phone that already has packs: they become full packs, except the bundled starter which is a sample', async () => {
+    const old = rawDb();
+    await old.execAsync(MIGRATIONS[0]);   // the first release
+    await old.execAsync('PRAGMA user_version = 1');
+    const add = (subject: string, starter: number) => old.runAsync(
+      `INSERT INTO packs (exam_slug, subject_slug, version, size_bytes, question_count, paper_count, years, starter, installed_at) VALUES ('jamb', ?, 1, 10, 5, 1, '[2020]', ?, '2026-09-26T10:00:00Z')`, [subject, starter]);
+    await add('physics', 0);
+    await add('biology', 1);
+
+    await migrate(old);
+
+    const tiers = await old.getAllAsync<{ subject_slug: string; tier: string }>('SELECT subject_slug, tier FROM packs ORDER BY subject_slug');
+    expect(tiers).toEqual([{ subject_slug: 'biology', tier: 'free' }, { subject_slug: 'physics', tier: 'full' }]);
   });
 });
 

@@ -15,6 +15,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\SummernoteController;
 use App\Http\Controllers\Student;
 use App\Http\Controllers\Console;
+use App\Http\Controllers\Api\V1\HandoffController;
 use App\Http\Controllers\Site;
 
 
@@ -37,6 +38,9 @@ Route::get('/pricing', [Site\PricingController::class, 'index'])->name('pricing'
 // Paystack sends the student back here; it checks with Paystack itself, so no sign-in is needed to land on it.
 Route::get('/checkout/callback', [Student\CheckoutController::class, 'callback'])->name('checkout.callback');
 Route::get('/download', [Site\HomeController::class, 'download'])->name('download');
+
+// The app opens the website already signed in (single use, signed, five minutes).
+Route::get('/app-link/{user}', [HandoffController::class, 'open'])->middleware(['signed', 'throttle:20,1'])->name('app.handoff');
 
 // Login routes
 Route::post('/login', [LoginController::class, 'login'])->name('login.submit');

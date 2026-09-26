@@ -42,6 +42,16 @@ export function dateTime(iso: string): string {
   return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()} ${h % 12 || 12}:${min} ${h < 12 ? 'am' : 'pm'}`;
 }
 
+/** "12 March 2026", the date part of the app-wide format. */
+export function formatDate(iso: string): string {
+  return dateTime(iso).replace(/ \d{1,2}:\d{2} (am|pm)$/, '');
+}
+
+/** 1500 is "₦1,500". */
+export function naira(amount: number): string {
+  return `\u20A6${Math.round(amount).toLocaleString('en-NG')}`;
+}
+
 export function initials(name: string): string {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('');
 }

@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
-import { formatBytes } from '@/core/format';
+import { formatBytes, formatDate, naira } from '@/core/format';
 import { buildViews } from '@/core/views';
 import type { Pack } from '@/core/types';
 import { useData, packKey } from '@/state/data';
@@ -10,6 +10,7 @@ import { useSettings } from '@/state/settings';
 import { Banner, Button, Card, Chip, Empty, ProgressBar, Row, Screen, Segmented, SubjectTile, T } from '@/ui/components';
 import { startDownload } from '@/ui/downloads';
 import { Icon } from '@/ui/Icon';
+import { unlockOnWebsite } from '@/ui/unlock';
 import { useTheme } from '@/ui/theme';
 
 export default function Practice() {
@@ -87,7 +88,7 @@ export default function Practice() {
                   >
                     <Row between>
                       <SubjectTile code={s.code} index={s.index} size={40} />
-                      {chosen ? <Icon name="check" size={18} color={c.primary} /> : s.installed ? null : <Icon name="download" size={16} color={c.muted} />}
+                      {chosen ? <Icon name="check" size={18} color={c.primary} /> : s.installed ? (s.locked ? <Icon name="lock" size={16} color={c.muted} /> : null) : <Icon name="download" size={16} color={c.muted} />}
                     </Row>
                     <View style={{ gap: 4 }}>
                       <T variant="h3">{s.name}</T>
@@ -96,7 +97,7 @@ export default function Practice() {
                       ) : dl?.error ? (
                         <T variant="small" color={c.danger}>{dl.error}</T>
                       ) : s.installed ? (
-                        <T variant="small" muted>{s.installed.question_count} questions{s.updateAvailable ? ' · update ready' : ''}</T>
+                        <T variant="small" muted>{s.locked ? 'Free sample · ' : ''}{s.installed.question_count} questions{s.updateAvailable && !s.locked ? ' · update ready' : ''}</T>
                       ) : (
                         <T variant="small" muted>{formatBytes(s.downloadBytes)}</T>
                       )}
@@ -106,6 +107,19 @@ export default function Practice() {
               })}
             </View>
           </View>
+
+          {subject?.locked ? (
+            <Card style={{ gap: 10, backgroundColor: c.accentSoft, borderColor: c.accentSoft }}>
+              <T variant="h3">You are using the free sample of {subject.name}</T>
+              <T variant="small">
+                {subject.installed?.question_count ?? subject.freeQuestions} questions{subject.fullQuestions ? ` of ${subject.fullQuestions}` : ''}. Unlock all of them{subject.price > 0 ? ` for ${naira(subject.price)}` : ''}, then they work offline too.
+              </T>
+              <Button label={`Unlock ${subject.name}`} icon="lock" onPress={() => void unlockOnWebsite({ exam: exam?.slug, subject: subject.slug })} />
+              <Button label="I have paid: refresh" variant="outline" small full={false} onPress={() => void useData.getState().refreshCatalogNow()} />
+            </Card>
+          ) : subject?.expiresAt ? (
+            <T variant="small" muted>Unlocked until {formatDate(subject.expiresAt)}.</T>
+          ) : null}
 
           {subject ? (
             <>

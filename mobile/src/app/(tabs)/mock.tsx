@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
-import { clock, dateTime, plural } from '@/core/format';
+import { clock, dateTime, naira, plural } from '@/core/format';
 import { MIN_QUESTIONS, plannedQuestions, validateChoice, type SubjectPack } from '@/core/mock';
 import { buildViews, formatFor } from '@/core/views';
 import { mocks } from '@/db/progress';
@@ -12,6 +12,7 @@ import { services } from '@/state/services';
 import { useSettings } from '@/state/settings';
 import { Badge, Banner, Button, Card, Empty, Row, Screen, Segmented, SubjectTile, T } from '@/ui/components';
 import { Icon } from '@/ui/Icon';
+import { unlockOnWebsite } from '@/ui/unlock';
 import { useTheme } from '@/ui/theme';
 
 export default function Mock() {
@@ -44,7 +45,9 @@ export default function Mock() {
     return { active, recent: await mocks(db, 3) };
   });
 
-  const available = exam?.subjects.filter((s) => s.installed && s.installed.question_count >= MIN_QUESTIONS) ?? [];
+  // A mock uses whole subjects, so it needs the full pack: a free sample is not enough.
+  const available = exam?.subjects.filter((s) => s.installed && s.installed.question_count >= MIN_QUESTIONS && !s.locked) ?? [];
+  const lockedSubjects = exam?.subjects.filter((s) => s.installed && s.locked) ?? [];
   const compulsory = format?.compulsory ?? null;
   const needMore = format ? format.subject_count - (compulsory ? 1 : 0) : 0;
 
@@ -132,8 +135,13 @@ export default function Mock() {
           ) : null}
 
           {format && available.length < format.subject_count ? (
-            <Empty icon="clock" title={`The ${exam.name} mock needs ${format.subject_count} ${plural(format.subject_count, 'subject')}`} body={`Only ${available.length} on your phone ${available.length === 1 ? 'has' : 'have'} enough questions. Download more subjects to unlock it.`}
-              action={<Button label="Manage downloads" full={false} variant="outline" onPress={() => router.push('/downloads')} />} />
+            lockedSubjects.length > 0 ? (
+              <Empty icon="lock" title="Unlock subjects to take this mock" body={`A mock exam uses every question in a subject, so its subjects must be unlocked. ${format.subject_count > 1 ? `The ${exam.name} mock needs ${format.subject_count} subjects` : `Unlock the subject you want to be tested on`}.`}
+                action={<Button label="Unlock subjects" icon="lock" full={false} onPress={() => void unlockOnWebsite({ exam: exam.slug })} />} />
+            ) : (
+              <Empty icon="clock" title={`The ${exam.name} mock needs ${format.subject_count} ${plural(format.subject_count, 'subject')}`} body={`Only ${available.length} on your phone ${available.length === 1 ? 'has' : 'have'} enough questions. Download more subjects to unlock it.`}
+                action={<Button label="Manage downloads" full={false} variant="outline" onPress={() => router.push('/downloads')} />} />
+            )
           ) : (
             <View style={{ gap: 10 }}>
               <T variant="h3">{compulsory ? `Choose ${needMore} more ${plural(needMore, 'subject')}` : format?.subject_count === 1 ? 'Choose a subject' : `Choose ${format?.subject_count} subjects`}</T>
@@ -161,6 +169,14 @@ export default function Mock() {
                   );
                 })}
               </View>
+              {lockedSubjects.map((s) => (
+                <Pressable key={s.slug} accessibilityRole="button" accessibilityLabel={`${s.name} is locked. Unlock for ${naira(s.price)}`} onPress={() => void unlockOnWebsite({ exam: exam?.slug, subject: s.slug })}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 14, backgroundColor: c.surface2 }}>
+                  <SubjectTile code={s.code} index={s.index} size={36} />
+                  <View style={{ flex: 1 }}><T variant="h3">{s.name}</T><T variant="small" muted>Locked{s.price > 0 ? ` · unlock for ${naira(s.price)}` : ''}</T></View>
+                  <Icon name="lock" size={16} color={c.muted} />
+                </Pressable>
+              ))}
               <T variant="tiny" muted>If a subject has fewer questions than the real exam, the mock is shorter and the clock is shortened to match.</T>
             </View>
           )}

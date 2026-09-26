@@ -31,8 +31,13 @@ export interface PackPaper {
   items: PackItem[];
 }
 
+/** "full" has every question; "free" is the small sample for a subject the student has not unlocked. */
+export type PackTier = 'full' | 'free';
+
 export interface Pack {
   format: number;
+  /** Packs from before free samples existed have no tier, and are full. */
+  tier?: PackTier;
   version: number;
   generated_at: string;
   exam: { slug: string; name: string };
@@ -67,6 +72,7 @@ export interface SessionData {
 // ---- catalog (GET /catalog) ----
 
 export interface CatalogPack {
+  tier?: PackTier;
   version: number;
   size_bytes: number;
   sha256: string;
@@ -83,6 +89,15 @@ export interface CatalogSubject {
   name: string;
   display_name: string;
   code: string;
+  /** "full" when unlocked (or free, or staff); "free" when only the sample is available. */
+  access?: 'full' | 'free';
+  /** Naira to unlock it; 0 means the subject is free. */
+  price?: number;
+  free_questions?: number;
+  /** When a purchase ends, or null. */
+  expires_at?: string | null;
+  /** How many questions unlocking gives. */
+  full_question_count?: number | null;
   pack: CatalogPack | null;
 }
 
@@ -90,6 +105,7 @@ export interface CatalogExam {
   id: number;
   slug: string;
   name: string;
+  bundle_price?: number | null;
   subjects: CatalogSubject[];
 }
 
@@ -107,6 +123,7 @@ export interface Catalog {
   mock: Record<string, MockFormat>;
   practice_counts: number[];
   strong_accuracy: number;
+  urls?: { pricing: string; checkout: string };
 }
 
 export interface User {
