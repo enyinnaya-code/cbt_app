@@ -146,6 +146,31 @@ class SiteContentTest extends TestCase
         $this->actingAs($admin)->get('/articles/draft-article')->assertOk()->assertSee('not live yet');
     }
 
+    public function test_every_kind_of_article_can_be_shared_to_whatsapp_facebook_x_or_by_copying_the_link(): void
+    {
+        foreach (['news', 'exam-news', 'results', 'scholarship', 'blog'] as $category) {
+            $post = $this->makePost(['category' => $category, 'title' => "Share me: $category & more", 'slug' => "share-$category"]);
+            $url = route('articles.show', $post->slug);
+            $html = $this->get("/articles/{$post->slug}")->assertOk()->getContent();
+
+            $this->assertStringContainsString('https://wa.me/?text=' . rawurlencode($post->title . ' ' . $url), $html, $category);
+            $this->assertStringContainsString('https://www.facebook.com/sharer/sharer.php?u=' . rawurlencode($url), $html, $category);
+            $this->assertStringContainsString('https://x.com/intent/post?text=' . rawurlencode($post->title) . '&amp;url=' . rawurlencode($url), $html, $category);
+            $this->assertStringContainsString('data-copy="' . $url . '"', $html, $category);
+            $this->assertSame(2, substr_count($html, 'aria-label="Share this article"'), 'a share row before and after the article');
+        }
+    }
+
+    public function test_share_links_do_not_break_on_quotes_and_symbols_in_a_title(): void
+    {
+        $post = $this->makePost(['title' => 'JAMB "2027" <b>timetable</b> & dates?', 'slug' => 'odd-title']);
+
+        $html = $this->get('/articles/odd-title')->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('<b>timetable</b>', $html);
+        $this->assertStringContainsString(rawurlencode('JAMB "2027" <b>timetable</b> & dates?'), $html);
+    }
+
     public function test_events_page_separates_upcoming_from_recently_passed(): void
     {
         $this->makeEvent(['title' => 'Next exam']);

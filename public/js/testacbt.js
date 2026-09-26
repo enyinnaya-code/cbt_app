@@ -38,6 +38,15 @@
     document.querySelectorAll('.usermenu.open').forEach(function (m) { if (!toggle || !m.contains(toggle)) { m.classList.remove('open'); } });
     if (toggle) { toggle.closest('.usermenu').classList.toggle('open'); }
 
+    var copier = e.target.closest('[data-copy]');
+    if (copier) { copyText(copier.getAttribute('data-copy'), copier); return; }
+
+    var sharer = e.target.closest('[data-native-share]');
+    if (sharer && navigator.share) {
+      navigator.share({ title: sharer.getAttribute('data-title'), url: sharer.getAttribute('data-url') }).catch(function () {});
+      return;
+    }
+
     var confirmer = e.target.closest('[data-confirm]');
     if (confirmer && !window.confirm(confirmer.getAttribute('data-confirm'))) { e.preventDefault(); }
   });
@@ -45,6 +54,33 @@
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') { document.querySelectorAll('.usermenu.open').forEach(function (m) { m.classList.remove('open'); }); }
   });
+
+  // Copy a link and say so. Falls back to a prompt where the clipboard is blocked (older browsers, plain http).
+  function copyText(text, button) {
+    function done() {
+      var old = button.getAttribute('data-label') || button.textContent.trim();
+      button.setAttribute('data-label', old);
+      button.classList.add('done');
+      button.lastChild.nodeType === 3 ? (button.lastChild.textContent = 'Copied!') : null;
+      setTimeout(function () { button.classList.remove('done'); button.lastChild.nodeType === 3 ? (button.lastChild.textContent = old) : null; }, 2000);
+    }
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(done, function () { window.prompt('Copy this link:', text); });
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (err) {}
+      document.body.removeChild(ta);
+      ok ? done() : window.prompt('Copy this link:', text);
+    }
+  }
+
+  // Phones that can share natively get a "More" button (Instagram, Telegram, SMS and so on).
+  if (navigator.share) {
+    document.querySelectorAll('[data-native-share]').forEach(function (b) { b.hidden = false; });
+  }
 
   syncThemeButtons();
 })();

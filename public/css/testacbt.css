@@ -345,3 +345,16 @@ table.table{width:100%;border-collapse:collapse;font-size:14px}
 
 /* The way back to the public website is always in the top bar; on narrow phones it shortens to "website". */
 @media (max-width:520px){.topbar-r .long{display:none}.topbar-r .badge{display:none}}
+
+/* Share row on articles */
+.share{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.share-label{font-size:13px;font-weight:700;color:var(--muted);margin-right:2px}
+.share a,.share button{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 14px;border-radius:99px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-weight:600;font-size:13px;text-decoration:none;cursor:pointer;font-family:inherit}
+.share a:hover,.share button:hover{background:var(--surface-2)}
+.share .ic{width:18px;height:18px}
+.share .ic.fill{fill:currentColor;stroke:none}
+.share .wa .ic{color:#25A55F}
+.share .fb .ic{color:#1877F2}
+.share button.done{background:var(--primary-soft);border-color:var(--primary);color:var(--primary-ink)}
+.share [hidden]{display:none}
+@media (max-width:520px){.share a,.share button{padding:0 12px}}

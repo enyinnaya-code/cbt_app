@@ -25,6 +25,8 @@
         <p class="small muted">{{ $post->published_at?->format('j F Y') ?? 'Draft' }} &middot; {{ $post->readMinutes() }} min read @if($post->author)&middot; {{ $post->author->name }}@endif</p>
     </div>
 
+    @include('site._share')
+
     @if($post->coverUrl())<img class="hero-img" src="{{ $post->coverUrl() }}" alt="">@endif
 
     @if($post->category === 'scholarship' && ($post->deadline || $post->source || $post->link_url))
@@ -35,6 +37,8 @@
     @endif
 
     <div class="prose">{!! $post->body !!}</div>
+
+    @include('site._share')
 
     @if($post->link_url && ! $post->isClosed())
         <div><a class="btn btn-p" href="{{ $post->link_url }}" target="_blank" rel="noopener noreferrer"><x-icon name="link" size="s"/>{{ $post->category === 'scholarship' ? 'Apply or read more' : 'Read more' }}</a></div>
