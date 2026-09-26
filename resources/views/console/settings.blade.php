@@ -9,15 +9,25 @@
 
 @if($errors->any())<div class="alert err" role="alert"><ul style="margin:0;padding-left:18px">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul></div>@endif
 
-<form method="POST" action="{{ route('console.settings.update') }}" class="stack" style="gap:20px">
+<form method="POST" enctype="multipart/form-data" action="{{ route('console.settings.update') }}" class="stack" style="gap:20px">
     @csrf @method('PUT')
 
     <section class="card stack" style="gap:14px">
         <h2 class="h2">App downloads</h2>
-        <p class="small muted">These appear as buttons on the landing page. Leave a box empty to show "Coming soon".</p>
+        <p class="small muted">These become the download buttons on the home page. Until the app is in a store, upload the Android app here and students can download it straight from your website. iPhones use the website as an app (Add to Home Screen) until an App Store link is added.</p>
         <div class="field"><label for="app_play_store_url">Google Play link</label><input id="app_play_store_url" name="app_play_store_url" type="url" class="input" value="{{ old('app_play_store_url', $values['app.play_store_url']) }}" placeholder="https://play.google.com/store/apps/details?id=com.testacbt.app"></div>
         <div class="field"><label for="app_app_store_url">App Store link</label><input id="app_app_store_url" name="app_app_store_url" type="url" class="input" value="{{ old('app_app_store_url', $values['app.app_store_url']) }}" placeholder="https://apps.apple.com/app/..."></div>
-        <div class="field"><label for="app_apk_url">Direct Android download (APK) <span class="muted">(optional)</span></label><input id="app_apk_url" name="app_apk_url" type="url" class="input" value="{{ old('app_apk_url', $values['app.apk_url']) }}" placeholder="https://"></div>
+        <div class="field"><label for="apk_file">Android app file (.apk)</label>
+            @if($apk)
+                <div class="alert ok" style="font-weight:500">Live on the website: <b>{{ \App\Http\Controllers\Console\SettingsController::formatBytes($apk['size']) }}</b>@if($apk['updated_at']), uploaded {{ \Illuminate\Support\Carbon::parse($apk['updated_at'])->format('j F Y g:i a') }}@endif. <a class="link" href="{{ $apk['url'] }}">Download it to check</a>.
+                    <label class="row small" style="gap:8px;margin-top:6px"><input type="checkbox" name="remove_apk" value="1"> Remove it from the website</label></div>
+            @endif
+            <input id="apk_file" name="apk_file" type="file" class="input" accept=".apk,application/vnd.android.package-archive" style="padding:10px 14px">
+            <span class="hint">Choosing a file replaces the current one. Up to 300 MB. This server accepts uploads up to <b>{{ \App\Http\Controllers\Console\SettingsController::formatBytes($uploadLimit) }}</b>{{ $uploadLimit > 0 && $uploadLimit < 100 * 1048576 ? ', so a bigger app needs the server limit raised (or use the link box below)' : '' }}.</span></div>
+        <div class="grid2">
+            <div class="field"><label for="app_apk_version">App version <span class="muted">(shown next to the button)</span></label><input id="app_apk_version" name="app_apk_version" class="input" value="{{ old('app_apk_version', $values['app.apk_version']) }}" maxlength="20" placeholder="1.0.0"></div>
+            <div class="field"><label for="app_apk_url">Or a link to the file hosted elsewhere <span class="muted">(optional)</span></label><input id="app_apk_url" name="app_apk_url" type="url" class="input" value="{{ old('app_apk_url', $values['app.apk_url']) }}" placeholder="https://"></div>
+        </div>
     </section>
 
     <section class="card stack" style="gap:14px">
@@ -42,6 +52,21 @@
             <div class="field"><label for="pricing_default_price">Price per subject (₦)</label><input id="pricing_default_price" name="pricing_default_price" type="number" min="0" class="input" value="{{ old('pricing_default_price', $values['pricing.default_price']) }}" placeholder="{{ \App\Services\Pricing::DEFAULT_PRICE }}"></div>
             <div class="field"><label for="pricing_free_questions">Free questions per subject</label><input id="pricing_free_questions" name="pricing_free_questions" type="number" min="0" class="input" value="{{ old('pricing_free_questions', $values['pricing.free_questions']) }}" placeholder="{{ \App\Services\Pricing::DEFAULT_FREE_QUESTIONS }}"></div>
             <div class="field"><label for="pricing_access_days">A purchase lasts (days)</label><input id="pricing_access_days" name="pricing_access_days" type="number" min="1" class="input" value="{{ old('pricing_access_days', $values['pricing.access_days']) }}" placeholder="{{ \App\Services\Pricing::DEFAULT_ACCESS_DAYS }}"></div>
+        </div>
+    </section>
+
+    <section class="card stack" style="gap:14px">
+        <h2 class="h2">Search engines and social media</h2>
+        <p class="small muted">Paste the verification code Google or Bing gives you (just the code, not the whole tag) to prove the site is yours in Search Console or Webmaster Tools. Your sitemap is <b>{{ url('/sitemap.xml') }}</b>. Social page links help search engines connect your pages to them.</p>
+        <div class="grid2">
+            <div class="field"><label for="seo_google_verification">Google Search Console code</label><input id="seo_google_verification" name="seo_google_verification" class="input" value="{{ old('seo_google_verification', $values['seo.google_verification']) }}" maxlength="120"></div>
+            <div class="field"><label for="seo_bing_verification">Bing Webmaster code</label><input id="seo_bing_verification" name="seo_bing_verification" class="input" value="{{ old('seo_bing_verification', $values['seo.bing_verification']) }}" maxlength="120"></div>
+        </div>
+        <div class="grid2">
+            <div class="field"><label for="social_facebook">Facebook page</label><input id="social_facebook" name="social_facebook" type="url" class="input" value="{{ old('social_facebook', $values['social.facebook']) }}" placeholder="https://facebook.com/..."></div>
+            <div class="field"><label for="social_x">X (Twitter) profile</label><input id="social_x" name="social_x" type="url" class="input" value="{{ old('social_x', $values['social.x']) }}" placeholder="https://x.com/..."></div>
+            <div class="field"><label for="social_instagram">Instagram</label><input id="social_instagram" name="social_instagram" type="url" class="input" value="{{ old('social_instagram', $values['social.instagram']) }}" placeholder="https://instagram.com/..."></div>
+            <div class="field"><label for="social_youtube">YouTube</label><input id="social_youtube" name="social_youtube" type="url" class="input" value="{{ old('social_youtube', $values['social.youtube']) }}" placeholder="https://youtube.com/..."></div>
         </div>
     </section>
 

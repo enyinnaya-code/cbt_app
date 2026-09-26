@@ -73,17 +73,109 @@ class SiteContentTest extends TestCase
             ->assertDontSee('Expired award');
     }
 
-    public function test_landing_says_coming_soon_until_store_links_are_set_then_links_to_them(): void
+    public function test_with_no_store_links_the_landing_page_offers_the_website_as_an_app_not_coming_soon(): void
     {
-        $this->get('/')->assertOk()->assertSee('Coming soon');
-
-        Setting::put(['app.play_store_url' => 'https://play.google.com/store/apps/details?id=com.testacbt.app']);
-
         $this->get('/')->assertOk()
-            ->assertSee('https://play.google.com/store/apps/details?id=com.testacbt.app', false)
-            ->assertSee('Google Play');
+            ->assertDontSee('Coming soon')
+            ->assertSee('Use it on your phone')->assertSee('Add to Home Screen')
+            ->assertSee('How to use TestaCBT on Android')->assertSee('How to add TestaCBT to your iPhone');
     }
 
+    public function test_store_links_replace_the_browser_fallbacks(): void
+    {
+        Setting::put(['app.play_store_url' => 'https://play.google.com/store/apps/details?id=com.testacbt.app', 'app.app_store_url' => 'https://apps.apple.com/app/id1']);
+
+        $this->get('/')->assertOk()
+            ->assertSee('https://play.google.com/store/apps/details?id=com.testacbt.app', false)->assertSee('Google Play')
+            ->assertSee('https://apps.apple.com/app/id1', false)->assertSee('App Store')
+            ->assertDontSee('How to use TestaCBT on Android')->assertDontSee('How to add TestaCBT to your iPhone');
+    }
+
+    public function test_a_link_to_an_apk_hosted_elsewhere_becomes_a_download_button(): void
+    {
+        Setting::put(['app.apk_url' => 'https://files.example.com/testacbt.apk', 'app.apk_version' => '1.2.0']);
+
+        $this->get('/')->assertOk()
+            ->assertSee('https://files.example.com/testacbt.apk', false)->assertSee('Download the app (APK)')
+            ->assertSee('Version 1.2.0')->assertSee('How to install the Android app')
+            ->assertDontSee('Use it on your phone');
+    }
+
+    private function fakeApk(string $content = "PK\x03\x04 pretend apk contents"): \Illuminate\Http\UploadedFile
+    {
+        return \Illuminate\Http\UploadedFile::fake()->createWithContent('testacbt-release.apk', $content);
+    }
+
+    private function settingsForm(array $over = []): array
+    {
+        return $over + ['app_play_store_url' => '', 'app_app_store_url' => '', 'app_apk_url' => '', 'app_apk_version' => '', 'support_email' => '', 'support_whatsapp' => ''];
+    }
+
+    public function test_an_admin_uploads_the_android_app_and_it_is_offered_on_the_website(): void
+    {
+        $admin = $this->makeUser(2);
+        $file = public_path('downloads/TestaCBT.apk');
+
+        try {
+            $this->actingAs($admin)->put('/console/settings', $this->settingsForm(['apk_file' => $this->fakeApk(), 'app_apk_version' => '1.0.3']))->assertSessionHasNoErrors();
+
+            $this->assertFileExists($file);
+            $this->assertSame('/downloads/TestaCBT.apk', Setting::get('app.apk_file'));
+
+            $this->get('/')->assertOk()
+                ->assertSee(url('/downloads/TestaCBT.apk'), false)->assertSee('Download the app (APK)')->assertSee('Version 1.0.3')
+                ->assertDontSee('Coming soon');
+            $this->actingAs($admin)->get('/console/settings')->assertOk()->assertSee('Live on the website');
+        } finally {
+            @unlink($file);
+        }
+    }
+
+    public function test_an_uploaded_app_is_removed_when_the_admin_asks(): void
+    {
+        $admin = $this->makeUser(2);
+        $file = public_path('downloads/TestaCBT.apk');
+
+        try {
+            $this->actingAs($admin)->put('/console/settings', $this->settingsForm(['apk_file' => $this->fakeApk()]));
+            $this->assertFileExists($file);
+
+            $this->actingAs($admin)->put('/console/settings', $this->settingsForm(['remove_apk' => 1]))->assertSessionHasNoErrors();
+
+            $this->assertFileDoesNotExist($file);
+            $this->assertNull(Setting::get('app.apk_file'));
+            $this->get('/')->assertSee('Use it on your phone');
+        } finally {
+            @unlink($file);
+        }
+    }
+
+    public function test_a_file_that_is_not_an_android_app_is_refused(): void
+    {
+        $admin = $this->makeUser(2);
+
+        $this->actingAs($admin)->put('/console/settings', $this->settingsForm(['apk_file' => $this->fakeApk('<?php echo "hello";')]))->assertSessionHasErrors('apk_file');
+        $this->actingAs($admin)->put('/console/settings', $this->settingsForm(['apk_file' => \Illuminate\Http\UploadedFile::fake()->createWithContent('photo.png', "PK\x03\x04")]))->assertSessionHasErrors('apk_file');
+
+        $this->assertFileDoesNotExist(public_path('downloads/TestaCBT.apk'));
+        $this->assertNull(Setting::get('app.apk_file'));
+    }
+
+    public function test_a_missing_uploaded_file_does_not_leave_a_broken_button(): void
+    {
+        Setting::put(['app.apk_file' => '/downloads/TestaCBT.apk']);
+        @unlink(public_path('downloads/TestaCBT.apk'));
+
+        $this->get('/')->assertOk()->assertDontSee('Download the app (APK)')->assertSee('Use it on your phone');
+    }
+
+    public function test_only_admins_can_upload_the_app(): void
+    {
+        $this->actingAs($this->makeUser(3))->put('/console/settings', $this->settingsForm(['apk_file' => $this->fakeApk()]))->assertForbidden();
+        $this->actingAs($this->makeUser(4))->put('/console/settings', $this->settingsForm(['apk_file' => $this->fakeApk()]))->assertForbidden();
+
+        $this->assertFileDoesNotExist(public_path('downloads/TestaCBT.apk'));
+    }
     public function test_download_link_sends_each_phone_to_its_own_store(): void
     {
         Setting::put(['app.play_store_url' => 'https://play.google.com/x', 'app.app_store_url' => 'https://apps.apple.com/y']);

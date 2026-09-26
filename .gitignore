@@ -22,3 +22,6 @@ yarn-error.log
 /.vscode
 /.zed
 .env.clone
+
+# Uploaded Android app (see Console > Content > Site settings)
+/public/downloads/*.apk

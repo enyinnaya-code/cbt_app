@@ -48,13 +48,32 @@ class HomeController extends Controller
         return redirect(route('welcome') . '#download');
     }
 
-    /** @return array{android:?string,ios:?string,apk:?string} */
+    /**
+     * Where each phone can get the app. The Android app can come from Google Play, from a file uploaded here, or from
+     * a link to a file hosted elsewhere; the page falls back to "use it in your browser" when there is nothing.
+     *
+     * @return array{android:?string,ios:?string,apk:?string,apk_version:?string,apk_size:int}
+     */
     public static function stores(): array
     {
+        $uploaded = self::uploadedApk();
+
         return [
             'android' => Setting::get('app.play_store_url'),
             'ios' => Setting::get('app.app_store_url'),
-            'apk' => Setting::get('app.apk_url'),
+            'apk' => $uploaded['url'] ?? Setting::get('app.apk_url'),
+            'apk_version' => Setting::get('app.apk_version'),
+            'apk_size' => $uploaded['size'] ?? 0,
         ];
+    }
+
+    /** The app file an admin uploaded, if it is still on the server. */
+    public static function uploadedApk(): ?array
+    {
+        $path = Setting::get('app.apk_file');
+
+        if (! $path || ! is_file(public_path(ltrim($path, '/')))) { return null; }
+
+        return ['url' => url($path), 'size' => (int) filesize(public_path(ltrim($path, '/'))), 'updated_at' => Setting::get('app.apk_updated_at')];
     }
 }

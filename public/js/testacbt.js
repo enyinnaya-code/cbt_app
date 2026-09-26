@@ -82,5 +82,16 @@
     document.querySelectorAll('[data-native-share]').forEach(function (b) { b.hidden = false; });
   }
 
+  // "How to install" links open their instructions.
+  function openInstallHelp(id) {
+    var el = id && document.getElementById(id.replace('#', ''));
+    if (el && el.tagName === 'DETAILS') { el.open = true; }
+  }
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest('a[href^="#install-"]');
+    if (a) { openInstallHelp(a.getAttribute('href')); }
+  });
+  openInstallHelp(location.hash);
+
   syncThemeButtons();
 })();

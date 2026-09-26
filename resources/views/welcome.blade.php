@@ -118,13 +118,18 @@
     <div class="app-band">
         <div class="stack" style="gap:16px">
             <h2>Take TestaCBT with you</h2>
-            <p>Download the app once, then practise anywhere, even with no data. Your progress saves to your account when you are online.</p>
+            @php $hasApp = $stores['android'] || $stores['apk'] || $stores['ios']; @endphp
+            <p>{{ $hasApp ? 'Download the app once, then practise anywhere, even with no data. Your progress saves to your account when you are online.' : 'Add TestaCBT to your phone\'s home screen and open it like any other app. Your progress is saved to your account.' }}</p>
             @include('site._stores', ['stores' => $stores])
         </div>
         <ul>
+            @if($hasApp)
             <li><x-icon name="wifioff"/>Works offline after the first download</li>
+            @endif
             <li><x-icon name="clock"/>Timed mock exams that keep your place</li>
+            @if($hasApp)
             <li><x-icon name="download"/>Small downloads, one subject at a time</li>
+            @endif
             <li><x-icon name="user"/>Same account on the web and your phone</li>
         </ul>
     </div>

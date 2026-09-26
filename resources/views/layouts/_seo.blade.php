@@ -36,4 +36,6 @@
     <meta name="theme-color" content="#0A7A4A">
     <meta name="application-name" content="TestaCBT">
     <meta name="apple-mobile-web-app-title" content="TestaCBT">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <link rel="alternate" type="application/rss+xml" title="TestaCBT news" href="{{ url('/feed.xml') }}">
