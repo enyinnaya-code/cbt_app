@@ -23,13 +23,38 @@ class MockService
 
     public function __construct(private QuestionSelector $selector) {}
 
-    /** The exam's format from config/testacbt.php, with a sensible single-subject default for other exams. */
+    /**
+     * The exam's mock format: what an admin set for it in the console, else config/testacbt.php (the built-in
+     * exams), else a sensible single-subject default. So a new exam an admin adds works straight away.
+     */
     public function format(Exam $exam): array
     {
-        $configured = config("testacbt.mock.{$exam->slug}");
+        if (is_array($exam->mock_format) && $exam->mock_format) {
+            return $exam->mock_format;
+        }
 
-        return $configured ?: [
-            'label' => $exam->name . ' mock', 'subject_count' => 1, 'questions' => ['default' => 50], 'minutes' => 60, 'score_max' => 100,
+        return config("testacbt.mock.{$exam->slug}") ?: self::defaultFormat($exam->name);
+    }
+
+    public static function defaultFormat(string $examName): array
+    {
+        return ['label' => $examName . ' mock', 'subject_count' => 1, 'compulsory' => null, 'questions' => ['default' => 50], 'minutes' => 60, 'score_max' => 100];
+    }
+
+    /**
+     * Builds a format from what an admin typed. Each subject is marked out of 100, so the total is 100 per subject.
+     *
+     * @param  array<string,int>  $perSubject  question counts for subjects that differ from the default, by subject slug
+     */
+    public static function makeFormat(string $label, int $subjectCount, ?string $compulsory, int $questions, array $perSubject, int $minutes): array
+    {
+        return [
+            'label' => $label,
+            'subject_count' => $subjectCount,
+            'compulsory' => $subjectCount > 1 ? $compulsory : null,
+            'questions' => ['default' => $questions] + array_filter($perSubject, fn ($n) => $n !== $questions),
+            'minutes' => $minutes,
+            'score_max' => 100 * $subjectCount,
         ];
     }
 

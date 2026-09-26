@@ -112,6 +112,7 @@ Route::middleware(['auth'])->group(function () {
             Route::post('exams', [Console\ExamController::class, 'store'])->name('exams.store');
             Route::get('exams/{exam}', [Console\ExamController::class, 'edit'])->name('exams.edit');
             Route::put('exams/{exam}', [Console\ExamController::class, 'update'])->name('exams.update');
+            Route::delete('exams/{exam}', [Console\ExamController::class, 'destroy'])->name('exams.destroy');
             Route::post('exams/{exam}/subjects', [Console\ExamController::class, 'attach'])->name('exams.attach');
             Route::delete('exams/{exam}/subjects/{subject}', [Console\ExamController::class, 'detach'])->name('exams.detach');
             Route::post('subjects', [Console\ExamController::class, 'storeSubject'])->name('subjects.store');

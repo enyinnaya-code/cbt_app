@@ -6,11 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class Exam extends Model
 {
-    protected $fillable = ['name', 'slug', 'is_active', 'sort_order', 'bundle_price'];
+    protected $fillable = ['name', 'slug', 'is_active', 'sort_order', 'bundle_price', 'mock_format'];
 
     protected function casts(): array
     {
-        return ['is_active' => 'boolean'];
+        return ['is_active' => 'boolean', 'mock_format' => 'array'];
     }
 
     public function subjects()

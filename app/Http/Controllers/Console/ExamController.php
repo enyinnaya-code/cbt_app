@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Console;
 use App\Http\Controllers\Controller;
 use App\Models\Exam;
 use App\Models\Subject;
+use App\Services\MockService;
 use App\Services\PackBuilder;
 use App\Services\Pricing;
 use Illuminate\Http\Request;
@@ -46,6 +47,9 @@ class ExamController extends Controller
             'attached' => $attached,
             'available' => Subject::whereNotIn('id', $attached->pluck('id'))->orderBy('name')->get(['id', 'name']),
             'defaults' => ['price' => Pricing::defaultPrice(), 'free' => Pricing::defaultFreeQuestions()],
+            'format' => app(MockService::class)->format($exam),
+            'customFormat' => is_array($exam->mock_format) && $exam->mock_format !== [],
+            'deletable' => ! $exam->papers()->exists() && ! \App\Models\Order::where('exam_id', $exam->id)->exists(),
         ]);
     }
 
@@ -61,9 +65,19 @@ class ExamController extends Controller
             'subjects.*.display_name' => ['nullable', 'string', 'max:80'],
             'subjects.*.price' => ['nullable', 'integer', 'min:0', 'max:10000000'],
             'subjects.*.free_questions' => ['nullable', 'integer', 'min:0', 'max:1000'],
+            'subjects.*.mock_questions' => ['nullable', 'integer', 'min:5', 'max:200'],
+            'mock_custom' => ['nullable', 'boolean'],
+            'mock_label' => ['nullable', 'string', 'max:60'],
+            'mock_subject_count' => ['required_if:mock_custom,1', 'nullable', 'integer', 'min:1', 'max:8'],
+            'mock_compulsory' => ['nullable', 'string', 'max:100'],
+            'mock_questions' => ['required_if:mock_custom,1', 'nullable', 'integer', 'min:5', 'max:200'],
+            'mock_minutes' => ['required_if:mock_custom,1', 'nullable', 'integer', 'min:5', 'max:300'],
         ], [
             '*.integer' => 'Prices and counts must be whole numbers, for example 1500.',
-            '*.min' => 'Prices and counts cannot be negative.',
+            '*.min' => 'Prices and counts cannot be negative, and a mock exam needs at least 5 questions and 5 minutes.',
+            'mock_subject_count.required_if' => 'Say how many subjects one mock exam has.',
+            'mock_questions.required_if' => 'Say how many questions each subject has in a mock exam.',
+            'mock_minutes.required_if' => 'Say how long a mock exam lasts.',
         ]);
 
         $before = $exam->subjects()->get()->mapWithKeys(fn ($s) => [$s->id => [$s->pivot->price, $s->pivot->free_questions]])->all();
@@ -75,6 +89,7 @@ class ExamController extends Controller
                 'is_active' => (bool) ($data['is_active'] ?? false),
                 'sort_order' => $data['sort_order'] ?? $exam->sort_order,
                 'bundle_price' => $data['bundle_price'] ?? null,
+                'mock_format' => $this->mockFormat($exam, $data),
             ]);
 
             $attached = $exam->subjects()->pluck('subjects.id')->flip();
@@ -98,6 +113,43 @@ class ExamController extends Controller
         }
 
         return back()->with('success', 'Saved.');
+    }
+
+    /** null means "use the standard format" (the built-in one for WAEC, NECO and JAMB, otherwise one subject of 50 questions in an hour). */
+    private function mockFormat(Exam $exam, array $data): ?array
+    {
+        if (empty($data['mock_custom'])) { return null; }
+
+        $slugs = $exam->subjects()->pluck('subjects.slug', 'subjects.id');
+        $perSubject = [];
+        foreach ($data['subjects'] ?? [] as $subjectId => $row) {
+            if (isset($slugs[(int) $subjectId]) && ($row['mock_questions'] ?? '') !== '') {
+                $perSubject[$slugs[(int) $subjectId]] = (int) $row['mock_questions'];
+            }
+        }
+
+        $compulsory = ! empty($data['mock_compulsory']) && $slugs->contains($data['mock_compulsory']) ? $data['mock_compulsory'] : null;
+
+        return MockService::makeFormat(
+            filled($data['mock_label'] ?? null) ? trim($data['mock_label']) : $exam->name . ' mock',
+            (int) $data['mock_subject_count'], $compulsory, (int) $data['mock_questions'], $perSubject, (int) $data['mock_minutes'],
+        );
+    }
+
+    /** An exam can be deleted only while nothing depends on it: no papers, and nobody has paid for it. */
+    public function destroy(Exam $exam)
+    {
+        if ($exam->papers()->exists()) {
+            return back()->with('error', "{$exam->name} still has papers. Delete or move them first.");
+        }
+        if (\App\Models\Order::where('exam_id', $exam->id)->exists()) {
+            return back()->with('error', "Students have ordered {$exam->name}, so it cannot be deleted. Hide it instead.");
+        }
+
+        $name = $exam->name;
+        $exam->delete();
+
+        return redirect()->route('console.exams.index')->with('success', "Deleted {$name}.");
     }
 
     public function attach(Request $request, Exam $exam)

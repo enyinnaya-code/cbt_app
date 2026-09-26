@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ContentPack;
 use App\Models\Exam;
 use App\Services\Access;
+use App\Services\MockService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -68,7 +69,7 @@ class CatalogController extends Controller
         // Mock exam formats travel with the catalog so the app follows the server's settings when they change.
         $body = [
             'exams' => $exams,
-            'mock' => collect(config('testacbt.mock'))->map(fn ($f) => [
+            'mock' => Exam::where('is_active', true)->get()->mapWithKeys(fn ($e) => [$e->slug => app(MockService::class)->format($e)])->map(fn ($f) => [
                 'label' => $f['label'],
                 'subject_count' => $f['subject_count'],
                 'compulsory' => $f['compulsory'] ?? null,

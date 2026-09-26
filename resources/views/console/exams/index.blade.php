@@ -29,7 +29,8 @@
 
 <div class="grid2">
     <form method="POST" action="{{ route('console.exams.store') }}" class="card stack" style="gap:12px">@csrf
-        <h2 class="h2">Add an exam</h2>
+        <h2 class="h2">Add an exam type</h2>
+        <p class="small muted">For example IELTS or GRE. It appears for students straight away, in Practice, Mock exam, Pricing and on the home page, once it has subjects and published papers.</p>
         <div class="field"><label for="exam-name">Name</label><input id="exam-name" name="name" class="input" maxlength="60" required placeholder="e.g. Common Entrance"></div>
         <div><button class="btn btn-p btn-sm" type="submit">Add exam</button></div>
     </form>
