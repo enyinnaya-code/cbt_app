@@ -61,6 +61,27 @@ node scripts/make-starter.mjs --from-api https://testacbt.com/api/v1 --token <to
 
 `npm run` is not needed: `node scripts/make-icons.mjs` redraws the placeholder icon set in `assets/images`. Replace those PNGs with final artwork any time.
 
+## Building the app online (GitHub Actions)
+
+`.github/workflows/build-android.yml` builds the signed `.apk` on GitHub's servers and saves it as `public/downloads/TestaCBT.apk`, so nothing needs to be built on a laptop and a `git pull` on the server puts it on the website.
+
+One-time setup, in the repository on GitHub: Settings, Secrets and variables, Actions, New repository secret. Add four secrets:
+
+| Secret | Value |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | the signing key file as text (command below) |
+| `ANDROID_KEYSTORE_PASSWORD` | `TESTACBT_KEYSTORE_PASSWORD` from your `~/.gradle/gradle.properties` |
+| `ANDROID_KEY_ALIAS` | `testacbt` |
+| `ANDROID_KEY_PASSWORD` | `TESTACBT_KEY_PASSWORD` from the same file |
+
+To copy the key file as text (PowerShell), then paste into the first secret:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("$env:USERPROFILE\.testacbt\testacbt-release.jks")) | Set-Clipboard
+```
+
+Then Actions, "Build Android app", Run workflow. It takes about 15 to 25 minutes. Use the same key every time: an installed app can only be updated by a build signed with the key it was first installed with. The workflow only runs when started by hand, because every saved build adds tens of megabytes to the repository's history.
+
 ## Releasing
 
 Package name and bundle id: `com.testacbt.app`.

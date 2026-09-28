@@ -36,13 +36,17 @@
         @endif
     </div>
 
-    <div class="hero-sheet" aria-hidden="true">
-        <div class="row between"><span class="h3">JAMB practice</span><span class="badge g">Answer sheet</span></div>
-        <div class="hero-row"><span class="q">1</span><span class="bub">A</span><span class="bub fill">B</span><span class="bub">C</span><span class="bub">D</span></div>
-        <div class="hero-row"><span class="q">2</span><span class="bub">A</span><span class="bub">B</span><span class="bub">C</span><span class="bub fill">D</span></div>
-        <div class="hero-row"><span class="q">3</span><span class="bub fill">A</span><span class="bub">B</span><span class="bub">C</span><span class="bub">D</span></div>
-        <div class="hero-row"><span class="q">4</span><span class="bub">A</span><span class="bub">B</span><span class="bub pencil">C</span><span class="bub">D</span></div>
-    </div>
+    <figure class="hero-photo">
+        <div class="hero-frame">
+        <img src="{{ asset('images/hero-cbt-hall.jpg') }}" width="1920" height="1280" alt="Students sitting a computer-based exam in a Nigerian CBT hall" fetchpriority="high">
+        <div class="hero-sheet" aria-hidden="true">
+            <div class="row between"><span class="h3">JAMB practice</span><span class="badge g">Answer sheet</span></div>
+            <div class="hero-row"><span class="q">1</span><span class="bub">A</span><span class="bub fill">B</span><span class="bub">C</span><span class="bub">D</span></div>
+            <div class="hero-row"><span class="q">2</span><span class="bub">A</span><span class="bub">B</span><span class="bub">C</span><span class="bub fill">D</span></div>
+        </div>
+        </div>
+        <figcaption>Photo: OtuNwachinemere, <a href="https://commons.wikimedia.org/wiki/File:Bida.poly_E-exams_lab_01.jpg" target="_blank" rel="noopener">Wikimedia Commons</a>, <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA 4.0</a></figcaption>
+    </figure>
 </section>
 
 <section class="features">

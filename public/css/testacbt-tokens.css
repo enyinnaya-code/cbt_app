@@ -1,8 +1,8 @@
 /* TestaCBT design tokens (from the SabiPrep design). No gradients anywhere.
    Defines variables only, so including this file does not restyle existing pages. */
 :root {
-  --page: #E9ECE8;
-  --bg: #F7F8F5;
+  --page: #FFFFFF;
+  --bg: #FFFFFF;
   --surface: #FFFFFF;
   --surface-2: #EEF1EC;
   --text: #13201A;

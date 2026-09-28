@@ -11,7 +11,7 @@ export interface Palette {
 }
 
 export const light: Palette = {
-  bg: '#F7F8F5', surface: '#FFFFFF', surface2: '#EEF1EC', text: '#13201A', muted: '#5A6A61', border: '#DCE2DB',
+  bg: '#FFFFFF', surface: '#FFFFFF', surface2: '#EEF1EC', text: '#13201A', muted: '#5A6A61', border: '#DCE2DB',
   primary: '#0A7A4A', onPrimary: '#FFFFFF', primarySoft: '#DCEFE4', primaryInk: '#086A40',
   accent: '#E8A200', accentSoft: '#FCF0CF', accentInk: '#7A5400',
   danger: '#C23A2E', dangerSoft: '#FAE3DF',

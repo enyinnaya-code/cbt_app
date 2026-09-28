@@ -180,7 +180,13 @@ a.card:hover{border-color:var(--primary)}
 .timer.low{background:var(--danger-soft);color:var(--danger)}
 
 /* Welcome hero: a mini answer sheet being shaded */
-.hero-sheet{background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:22px 20px;display:flex;flex-direction:column;gap:12px}
+.hero-sheet{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.hero-photo{margin:0}
+.hero-frame{position:relative}
+.hero-photo img{display:block;width:100%;height:auto;aspect-ratio:4/3;object-fit:cover;object-position:center 65%;border-radius:24px;border:1px solid var(--border);background:var(--surface-2)}
+.hero-photo .hero-sheet{position:absolute;left:-16px;bottom:-14px;width:min(70%,250px);box-shadow:var(--shadow)}
+.hero-photo figcaption{margin-top:22px;font-size:11px;color:var(--muted);text-align:right}
+.hero-photo figcaption a{color:inherit;text-decoration:underline}
 .hero-row{display:flex;align-items:center;gap:10px;font-weight:700;font-size:13px;color:var(--muted)}
 .hero-row .q{width:22px}
 .hero-row .bub{width:30px;height:30px;font-size:12px}
@@ -214,6 +220,7 @@ a.card:hover{border-color:var(--primary)}
   .page{padding:20px 16px 110px}
   .topbar-in{padding:10px 16px}
   .hero{grid-template-columns:1fr;gap:28px;padding-top:8px}
+  .hero-photo .hero-sheet{left:12px;bottom:-14px}
   .features{grid-template-columns:1fr}
   .grid4{grid-template-columns:1fr 1fr}
   .grid3{grid-template-columns:1fr}
