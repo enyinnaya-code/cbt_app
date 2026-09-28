@@ -19,7 +19,6 @@ class SettingsController extends Controller
     /** Setting key => validation rule. Only these keys can be saved from the form. */
     private const FIELDS = [
         'app.play_store_url' => ['nullable', 'url:https', 'max:500'],
-        'app.app_store_url' => ['nullable', 'url:https', 'max:500'],
         'app.apk_url' => ['nullable', 'url:http,https', 'max:500'],
         'app.apk_version' => ['nullable', 'string', 'max:20'],
         'seo.google_verification' => ['nullable', 'string', 'max:120', 'regex:/^[A-Za-z0-9_\-]*$/'],

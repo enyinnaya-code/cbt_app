@@ -77,18 +77,17 @@ class SiteContentTest extends TestCase
     {
         $this->get('/')->assertOk()
             ->assertDontSee('Coming soon')
-            ->assertSee('Use it on your phone')->assertSee('Add to Home Screen')
-            ->assertSee('How to use TestaCBT on Android')->assertSee('How to add TestaCBT to your iPhone');
+            ->assertSee('Use it on your phone')->assertSee('How to use TestaCBT on Android')
+            ->assertDontSee('iPhone')->assertDontSee('App Store');
     }
 
     public function test_store_links_replace_the_browser_fallbacks(): void
     {
-        Setting::put(['app.play_store_url' => 'https://play.google.com/store/apps/details?id=com.testacbt.app', 'app.app_store_url' => 'https://apps.apple.com/app/id1']);
+        Setting::put(['app.play_store_url' => 'https://play.google.com/store/apps/details?id=com.testacbt.app']);
 
         $this->get('/')->assertOk()
             ->assertSee('https://play.google.com/store/apps/details?id=com.testacbt.app', false)->assertSee('Google Play')
-            ->assertSee('https://apps.apple.com/app/id1', false)->assertSee('App Store')
-            ->assertDontSee('How to use TestaCBT on Android')->assertDontSee('How to add TestaCBT to your iPhone');
+            ->assertDontSee('How to use TestaCBT on Android')->assertDontSee('iPhone')->assertDontSee('App Store');
     }
 
     public function test_a_link_to_an_apk_hosted_elsewhere_becomes_a_download_button(): void
@@ -133,7 +132,7 @@ class SiteContentTest extends TestCase
 
     private function settingsForm(array $over = []): array
     {
-        return $over + ['app_play_store_url' => '', 'app_app_store_url' => '', 'app_apk_url' => '', 'app_apk_version' => '', 'support_email' => '', 'support_whatsapp' => ''];
+        return $over + ['app_play_store_url' => '', 'app_apk_url' => '', 'app_apk_version' => '', 'support_email' => '', 'support_whatsapp' => ''];
     }
 
     /** Puts the release build that ships with the code (and its details) in the temporary public folder. */
@@ -225,12 +224,12 @@ class SiteContentTest extends TestCase
 
         $this->assertFileDoesNotExist($dir . '/downloads/TestaCBT-upload.apk');
     }
-    public function test_download_link_sends_each_phone_to_its_own_store(): void
+    public function test_download_link_sends_android_phones_to_the_app_and_everyone_else_to_the_download_section(): void
     {
-        Setting::put(['app.play_store_url' => 'https://play.google.com/x', 'app.app_store_url' => 'https://apps.apple.com/y']);
+        Setting::put(['app.play_store_url' => 'https://play.google.com/x']);
 
         $this->withHeader('User-Agent', 'Mozilla/5.0 (Linux; Android 13; Tecno)')->get('/download')->assertRedirect('https://play.google.com/x');
-        $this->withHeader('User-Agent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0)')->get('/download')->assertRedirect('https://apps.apple.com/y');
+        $this->withHeader('User-Agent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0)')->get('/download')->assertRedirect(route('welcome') . '#download');
         $this->withHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0)')->get('/download')->assertRedirect(route('welcome') . '#download');
     }
 
@@ -537,11 +536,10 @@ class SiteContentTest extends TestCase
 
         $this->actingAs($admin)->put('/console/settings', [
             'app_play_store_url' => 'https://play.google.com/store/apps/details?id=com.testacbt.app',
-            'app_app_store_url' => '', 'app_apk_url' => '', 'support_email' => 'help@testacbt.com', 'support_whatsapp' => '',
+            'app_apk_url' => '', 'support_email' => 'help@testacbt.com', 'support_whatsapp' => '',
         ])->assertRedirect();
 
         $this->assertSame('help@testacbt.com', Setting::get('support.email'));
-        $this->assertNull(Setting::get('app.app_store_url'));
 
         $this->actingAs($admin)->put('/console/settings', ['app_play_store_url' => 'http://not-secure.example', 'support_email' => 'nope'])
             ->assertSessionHasErrors(['app_play_store_url', 'support_email']);

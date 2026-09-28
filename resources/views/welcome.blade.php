@@ -132,7 +132,7 @@
     <div class="app-band">
         <div class="stack" style="gap:16px">
             <h2>Take TestaCBT with you</h2>
-            @php $hasApp = $stores['android'] || $stores['apk'] || $stores['ios']; @endphp
+            @php $hasApp = $stores['android'] || $stores['apk']; @endphp
             <p>{{ $hasApp ? 'Download the app once, then practise anywhere, even with no data. Your progress saves to your account when you are online.' : 'Add TestaCBT to your phone\'s home screen and open it like any other app. Your progress is saved to your account.' }}</p>
             @include('site._stores', ['stores' => $stores])
         </div>

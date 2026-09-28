@@ -1,7 +1,8 @@
-{{-- One video. Expects $video. The player is only loaded when the visitor presses play, so the page stays fast and no
-     other site is contacted until then. --}}
+{{-- One video. Expects $video. Every card has the same size. The player is only loaded when the visitor presses play,
+     so the page stays fast and no other site is contacted until then. Wide videos play in the card; TikTok and X posts
+     are not wide, so they play in a popup that fits them. --}}
 <article class="video-card">
-    <div class="video-frame {{ $video->isTall() ? 'tall' : ($video->platform === 'x' ? 'post' : '') }}" data-embed="{{ $video->embed_url }}" data-title="{{ $video->title }}">
+    <div class="video-frame" @if($video->isTall() || $video->platform === 'x') data-modal="{{ $video->isTall() ? 'tall' : 'post' }}" @endif data-embed="{{ $video->embed_url }}" data-title="{{ $video->title }}">
         <button type="button" class="video-play" aria-label="Play video: {{ $video->title }}">
             @if($video->thumbnail_url)<img src="{{ $video->thumbnail_url }}" alt="" loading="lazy" width="480" height="360">@endif
             <span class="video-badge"><x-icon name="play"/></span>

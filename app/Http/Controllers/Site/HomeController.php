@@ -34,7 +34,7 @@ class HomeController extends Controller
         ]);
     }
 
-    /** A short link for QR codes and text messages: sends each phone to its own store, or to the download section. */
+    /** A short link for QR codes and text messages: sends Android phones to the app, and everyone else to the download section. */
     public function download(Request $request)
     {
         $stores = $this->stores();
@@ -42,9 +42,6 @@ class HomeController extends Controller
 
         if (str_contains($agent, 'android') && ($stores['android'] ?: $stores['apk'])) {
             return redirect()->away($stores['android'] ?: $stores['apk']);
-        }
-        if ((str_contains($agent, 'iphone') || str_contains($agent, 'ipad')) && $stores['ios']) {
-            return redirect()->away($stores['ios']);
         }
 
         return redirect(route('welcome') . '#download');
@@ -55,7 +52,7 @@ class HomeController extends Controller
      * console, or the release build that ships with the code), or from a link to a file hosted elsewhere. The page falls
      * back to "use it in your browser" when there is nothing.
      *
-     * @return array{android:?string,ios:?string,apk:?string,apk_version:?string,apk_size:int}
+     * @return array{android:?string,apk:?string,apk_version:?string,apk_size:int}
      */
     public static function stores(): array
     {
@@ -63,7 +60,6 @@ class HomeController extends Controller
 
         return [
             'android' => Setting::get('app.play_store_url'),
-            'ios' => Setting::get('app.app_store_url'),
             'apk' => $apk['url'] ?? Setting::get('app.apk_url'),
             'apk_version' => $apk ? $apk['version'] : Setting::get('app.apk_version'),
             'apk_size' => $apk['size'] ?? 0,

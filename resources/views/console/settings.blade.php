@@ -14,9 +14,8 @@
 
     <section class="card stack" style="gap:14px">
         <h2 class="h2">App downloads</h2>
-        <p class="small muted">These become the download buttons on the home page. Until the app is in a store, upload the Android app here and students can download it straight from your website. iPhones use the website as an app (Add to Home Screen) until an App Store link is added.</p>
+        <p class="small muted">These become the download buttons on the home page. Until the app is in a store, upload the Android app here and students can download it straight from your website.</p>
         <div class="field"><label for="app_play_store_url">Google Play link</label><input id="app_play_store_url" name="app_play_store_url" type="url" class="input" value="{{ old('app_play_store_url', $values['app.play_store_url']) }}" placeholder="https://play.google.com/store/apps/details?id=com.testacbt.app"></div>
-        <div class="field"><label for="app_app_store_url">App Store link</label><input id="app_app_store_url" name="app_app_store_url" type="url" class="input" value="{{ old('app_app_store_url', $values['app.app_store_url']) }}" placeholder="https://apps.apple.com/app/..."></div>
         <div class="field"><label for="apk_file">Android app file (.apk)</label>
             @if($apk['chosen'])
                 <div class="alert ok" style="font-weight:500">Offered on the website now: <b>{{ $apk['chosen'] === $apk['upload'] ? 'the file uploaded here' : 'the release build that came with the code' }}</b>, {{ \App\Http\Controllers\Console\SettingsController::formatBytes($apk['chosen']['size']) }}@if($apk['chosen']['version']), version {{ $apk['chosen']['version'] }}@endif. <a class="link" href="{{ $apk['chosen']['url'] }}">Download it to check</a>.

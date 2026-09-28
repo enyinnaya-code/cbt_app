@@ -60,20 +60,48 @@
 
   // Videos load only when played: the page stays fast and no other site is contacted before then.
   // The address comes from the server (built from the video id for YouTube, Facebook, X or TikTok only).
+  // Every card is the same size. Wide videos (YouTube, Facebook) play inside the card; TikTok and X posts are not wide,
+  // so they play in a popup shaped to fit them.
   function loadVideo(frame) {
-    if (!frame || frame.querySelector('iframe')) { return; }
+    if (!frame) { return; }
     var src = frame.getAttribute('data-embed') || '';
     if (!/^https:\/\/(www\.youtube-nocookie\.com|www\.facebook\.com|platform\.twitter\.com|www\.tiktok\.com)\//.test(src)) { return; }
+    var iframe = buildPlayer(src, frame.getAttribute('data-title'));
+    var shape = frame.getAttribute('data-modal');
+    if (shape) { openVideoDialog(iframe, shape); return; }
+    if (frame.querySelector('iframe')) { return; }
+    frame.innerHTML = '';
+    frame.appendChild(iframe);
+  }
+
+  function buildPlayer(src, title) {
     var iframe = document.createElement('iframe');
     iframe.src = src;
-    iframe.title = frame.getAttribute('data-title') || 'Video';
+    iframe.title = title || 'Video';
     iframe.loading = 'lazy';
     iframe.allow = 'autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write';
     iframe.allowFullscreen = true;
     iframe.referrerPolicy = 'strict-origin-when-cross-origin';
     iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-presentation allow-popups allow-popups-to-escape-sandbox');
-    frame.innerHTML = '';
-    frame.appendChild(iframe);
+    return iframe;
+  }
+
+  function openVideoDialog(iframe, shape) {
+    var dialog = document.getElementById('video-dialog');
+    if (!dialog) {
+      dialog = document.createElement('dialog');
+      dialog.id = 'video-dialog';
+      dialog.className = 'video-dialog';
+      dialog.innerHTML = '<button type="button" class="video-close" aria-label="Close video">&times;</button><div class="video-stage"></div>';
+      dialog.addEventListener('click', function (e) { if (e.target === dialog || e.target.closest('.video-close')) { dialog.close(); } });
+      dialog.addEventListener('close', function () { dialog.querySelector('.video-stage').innerHTML = ''; });
+      document.body.appendChild(dialog);
+    }
+    dialog.classList.toggle('post', shape === 'post');
+    var stage = dialog.querySelector('.video-stage');
+    stage.innerHTML = '';
+    stage.appendChild(iframe);
+    if (typeof dialog.showModal === 'function') { dialog.showModal(); } else { dialog.setAttribute('open', ''); }
   }
 
   // Copy a link and say so. Falls back to a prompt where the clipboard is blocked (older browsers, plain http).

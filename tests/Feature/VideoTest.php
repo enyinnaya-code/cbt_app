@@ -202,7 +202,9 @@ class VideoTest extends TestCase
             $this->assertStringContainsString($embed, $html);
         }
         $this->assertStringContainsString('Watch on TikTok', $html);
-        $this->assertStringContainsString('class="video-frame tall"', $html);
+        $this->assertStringContainsString('data-modal="tall"', $html);
+        $this->assertStringContainsString('data-modal="post"', $html);
+        $this->assertStringNotContainsString('video-frame tall', $html);
     }
 
     public function test_no_player_is_loaded_until_play_is_pressed(): void
