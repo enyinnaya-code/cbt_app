@@ -1,0 +1,99 @@
+# Builds the signed Android app (.apk) on GitHub's servers, so it does not need to be built on a laptop.
+# Run it from the repository's Actions tab: "Build Android app" > "Run workflow".
+# When it finishes, the app is saved as public/downloads/TestaCBT.apk in the repository, so a `git pull` on the
+# server puts it on the website. It is also attached to the run as a download.
+#
+# One-time setup: Settings > Secrets and variables > Actions > New repository secret, four times over:
+#   ANDROID_KEYSTORE_BASE64     the signing key file, as text (see mobile/README.md, "Building the app online")
+#   ANDROID_KEYSTORE_PASSWORD
+#   ANDROID_KEY_ALIAS           testacbt
+#   ANDROID_KEY_PASSWORD
+name: Build Android app
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: Save the finished app into the repository (public/downloads)
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-android
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Check the signing secrets are set
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          for name in KEYSTORE STORE_PASSWORD ALIAS KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then echo "::error::A signing secret is missing ($name). See the notes at the top of .github/workflows/build-android.yml."; exit 1; fi
+          done
+
+      - name: Install the app's packages
+        working-directory: mobile
+        run: npm ci
+
+      - name: Set up the signing key
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          mkdir -p "$HOME/.testacbt" "$HOME/.gradle"
+          printf '%s' "$KEYSTORE" | base64 --decode > "$HOME/.testacbt/testacbt-release.jks"
+          {
+            echo "TESTACBT_KEYSTORE=$HOME/.testacbt/testacbt-release.jks"
+            echo "TESTACBT_KEYSTORE_PASSWORD=$STORE_PASSWORD"
+            echo "TESTACBT_KEY_ALIAS=$ALIAS"
+            echo "TESTACBT_KEY_PASSWORD=$KEY_PASSWORD"
+          } >> "$HOME/.gradle/gradle.properties"
+
+      - name: Build the app
+        working-directory: mobile
+        run: node scripts/build-apk.mjs
+
+      - name: Attach the app to this run
+        uses: actions/upload-artifact@v4
+        with:
+          name: TestaCBT-apk
+          path: |
+            public/downloads/TestaCBT.apk
+            public/downloads/TestaCBT.json
+          if-no-files-found: error
+
+      - name: Save the app in the repository
+        if: ${{ inputs.commit }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/downloads/TestaCBT.apk public/downloads/TestaCBT.json
+          if git diff --cached --quiet; then echo "No change to save."; exit 0; fi
+          git commit -m "Build the Android app (GitHub Actions run ${{ github.run_number }})"
+          git pull --rebase origin "${{ github.ref_name }}"
+          git push origin "HEAD:${{ github.ref_name }}"
