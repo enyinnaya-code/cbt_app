@@ -540,7 +540,7 @@ class ConsoleTest extends TestCase
 
         $this->actingAs($this->admin)->get('/console/users?q=chidi')->assertSee('Chidinma')->assertDontSee('Bola Ade');
         $this->actingAs($this->admin)->get('/console/users?state=suspended')->assertSee('Bola Ade')->assertDontSee('Chidinma');
-        $this->actingAs($this->admin)->get('/console/users?role=examiner')->assertSee($this->examiner->name)->assertDontSee('Chidinma');
+        $this->actingAs($this->admin)->get('/console/users?tab=examiner')->assertSee($this->examiner->name)->assertDontSee('Chidinma');
     }
 
     public function test_an_admin_can_create_an_examiner_but_not_a_duplicate(): void

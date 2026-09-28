@@ -73,11 +73,11 @@ class SiteContentTest extends TestCase
             ->assertDontSee('Expired award');
     }
 
-    public function test_with_no_store_links_the_landing_page_offers_the_website_as_an_app_not_coming_soon(): void
+    public function test_with_no_app_available_the_landing_page_has_no_app_section_and_no_coming_soon(): void
     {
         $this->get('/')->assertOk()
             ->assertDontSee('Coming soon')
-            ->assertSee('Use it on your phone')->assertSee('How to use TestaCBT on Android')
+            ->assertDontSee('Take TestaCBT with you')->assertDontSee('Use it on your phone')->assertDontSee('id="download"', false)
             ->assertDontSee('iPhone')->assertDontSee('App Store');
     }
 
@@ -212,7 +212,7 @@ class SiteContentTest extends TestCase
     {
         $this->tempPublic();
 
-        $this->get('/')->assertOk()->assertDontSee('Download the app (APK)')->assertSee('Use it on your phone');
+        $this->get('/')->assertOk()->assertDontSee('Download the app (APK)')->assertDontSee('Take TestaCBT with you');
     }
 
     public function test_only_admins_can_upload_the_app(): void

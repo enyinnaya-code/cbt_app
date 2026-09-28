@@ -258,6 +258,12 @@ table.table{width:100%;border-collapse:collapse;font-size:14px}
 .pager a:hover{background:var(--surface-2)}
 .pager .cur{background:var(--text);border-color:var(--text);color:var(--bg)}
 .pager .off{opacity:.4}
+.tabbar{display:flex;gap:4px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}
+.tabbar::-webkit-scrollbar{display:none}
+.tabbar a{display:inline-flex;align-items:center;gap:8px;padding:12px 16px;font-weight:700;font-size:14px;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1px;white-space:nowrap;text-decoration:none}
+.tabbar a:hover{color:var(--text)}
+.tabbar a.on{color:var(--text);border-bottom-color:var(--primary)}
+.pager-bar{display:flex;gap:12px 20px;flex-wrap:wrap;align-items:center;justify-content:space-between}
 .item{display:flex;gap:14px;padding:14px 16px;border:1px solid var(--border);border-radius:16px;background:var(--surface)}
 .item.passage{background:var(--surface-2);border-style:dashed}
 .item .num{width:34px;height:34px;border-radius:50%;border:2px solid var(--border);display:grid;place-items:center;font-weight:700;font-size:12px;color:var(--muted);flex:none}

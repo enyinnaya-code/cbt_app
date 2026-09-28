@@ -13,39 +13,59 @@ class UserController extends Controller
     /** Legacy user_type each role maps to (the old school screens still read it). */
     private const TYPE = [User::ROLE_ADMIN => 2, User::ROLE_EXAMINER => 3, User::ROLE_STUDENT => 4];
 
+    /** How many people one page of a table can show. */
+    public const PER_PAGE = [25, 50, 100];
+
+    /** The three tabs, in the order they are shown. */
+    private const TABS = [
+        User::ROLE_ADMIN => ['title' => 'Admins', 'empty' => 'No admins'],
+        User::ROLE_EXAMINER => ['title' => 'Examiners', 'empty' => 'No examiners'],
+        User::ROLE_STUDENT => ['title' => 'Students', 'empty' => 'No students'],
+    ];
+
     public function index(Request $request)
     {
-        $f = $request->validate(['q' => ['nullable', 'string', 'max:80'], 'role' => ['nullable', 'in:admin,examiner,student'], 'state' => ['nullable', 'in:active,suspended']]);
+        $f = $request->validate([
+            'q' => ['nullable', 'string', 'max:80'],
+            'tab' => ['nullable', 'in:admin,examiner,student'],
+            'state' => ['nullable', 'in:active,suspended'],
+            'per_page' => ['nullable', 'integer', 'in:' . implode(',', self::PER_PAGE)],
+        ]);
 
         $filtered = fn (string $role) => User::query()->where('role', $role)
             ->when($f['q'] ?? null, fn ($q, $v) => $q->where(fn ($w) => $w->where('name', 'like', '%' . addcslashes($v, '%_\\') . '%')->orWhere('email', 'like', '%' . addcslashes($v, '%_\\') . '%')))
             ->when(($f['state'] ?? null) === 'active', fn ($q) => $q->where('is_active', 1))
             ->when(($f['state'] ?? null) === 'suspended', fn ($q) => $q->where('is_active', 0));
 
-        // Admins, examiners and students are kept in three separate tables so nobody is mistaken for another role.
-        // Each has its own page number, so paging through students does not move the admins table.
-        $sections = [
-            ['role' => User::ROLE_ADMIN, 'title' => 'Admins', 'empty' => 'No admins'],
-            ['role' => User::ROLE_EXAMINER, 'title' => 'Examiners', 'empty' => 'No examiners'],
-            ['role' => User::ROLE_STUDENT, 'title' => 'Students', 'empty' => 'No students'],
-        ];
+        // Admins, examiners and students are kept apart, one tab each, so nobody is mistaken for another role.
+        // The tab badges count the people who match the search, so it is clear where the matches are.
+        $matches = [];
+        foreach (array_keys(self::TABS) as $role) { $matches[$role] = $filtered($role)->count(); }
 
-        $tables = [];
-        foreach ($sections as $section) {
-            if (! empty($f['role']) && $f['role'] !== $section['role']) { continue; }
+        // With no tab chosen, open the first one that has someone in it (when searching) rather than an empty one.
+        $tab = $f['tab'] ?? null;
+        if (! $tab) {
+            $tab = User::ROLE_ADMIN;
+            if (($f['q'] ?? null) || ($f['state'] ?? null)) {
+                $tab = collect($matches)->filter()->keys()->first() ?? $tab;
+            }
+        }
 
-            $paginator = $filtered($section['role'])->orderBy('name')->orderBy('id')
-                ->paginate(25, ['*'], $section['role'] . 's_page')->withQueryString();
+        $perPage = (int) ($f['per_page'] ?? self::PER_PAGE[0]);
+        $users = $filtered($tab)->orderBy('name')->orderBy('id')->paginate($perPage)->withQueryString();
 
-            // While searching or filtering by status, a table with nothing in it is just noise.
-            if ($paginator->total() === 0 && (! empty($f['q']) || ! empty($f['state']))) { continue; }
-
-            $tables[] = $section + ['users' => $paginator];
+        // A page number past the end (after suspending or searching) goes to the last page instead of showing nothing.
+        if ($users->isEmpty() && $users->total() > 0) {
+            return redirect($users->url($users->lastPage()));
         }
 
         return view('console.users', [
-            'tables' => $tables,
+            'tab' => $tab,
+            'tabs' => self::TABS,
+            'matches' => $matches,
+            'users' => $users,
             'filters' => $f,
+            'perPage' => $perPage,
             'counts' => User::selectRaw('role, COUNT(*) as n')->groupBy('role')->pluck('n', 'role'),
         ]);
     }
