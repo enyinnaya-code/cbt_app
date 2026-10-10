@@ -106,7 +106,14 @@ class CheckoutController extends Controller
         $status = $transaction['status'] ?? '';
 
         if ($status === 'success') {
-            $matches = (int) ($transaction['amount'] ?? -1) === $order->amount * 100
+            // Paystack's amount is what was charged. When the account makes the customer bear the card fee, that is the price
+            // plus the fee, and the price itself is requested_amount. Either way the price must have been paid in full.
+            $expected = $order->amount * 100;
+            $charged = (int) ($transaction['amount'] ?? -1);
+            $requested = isset($transaction['requested_amount']) ? (int) $transaction['requested_amount'] : null;
+            $paidInFull = $charged === $expected || ($requested === $expected && $charged >= $expected);
+
+            $matches = $paidInFull
                 && strtoupper((string) ($transaction['currency'] ?? '')) === $order->currency
                 && (string) ($transaction['reference'] ?? '') === $order->reference;
 
@@ -121,10 +128,20 @@ class CheckoutController extends Controller
             return ['flash' => 'success', 'message' => 'Payment received. Your subjects are unlocked.'];
         }
 
+        // Still under way: a bank transfer or USSD payment can take a few minutes after the student is sent back. Nothing is
+        // decided yet, so the order stays open and the webhook unlocks it the moment Paystack confirms the payment.
+        if (in_array($status, ['pending', 'ongoing', 'processing', 'queued'], true)) {
+            return ['flash' => 'error', 'message' => 'Your payment is still being processed. Once your bank confirms it, your subjects unlock by themselves, usually within a few minutes. You do not need to pay again.'];
+        }
+
         if (in_array($status, ['failed', 'abandoned', 'reversed'], true) && $order->status === Order::PENDING) {
             $order->update(['status' => Order::FAILED]);
         }
 
-        return ['flash' => 'error', 'message' => 'The payment was not completed. You have not been charged.'];
+        // What the bank or card issuer said (for example "Insufficient funds"), when Paystack gives it. Shown as plain text.
+        $reason = trim((string) ($transaction['gateway_response'] ?? ''));
+        $reason = ($status === 'failed' && $reason !== '' && mb_strlen($reason) <= 80) ? " Your bank said: {$reason}." : '';
+
+        return ['flash' => 'error', 'message' => 'The payment was not completed. You have not been charged.' . $reason];
     }
 }

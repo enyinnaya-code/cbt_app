@@ -289,6 +289,69 @@ class PaymentTest extends TestCase
         $this->assertSame(Order::FAILED, $order->fresh()->status);
     }
 
+    public function test_a_payment_still_in_progress_is_not_called_failed_and_the_webhook_can_finish_it(): void
+    {
+        $this->paystackOn();
+
+        foreach (['pending', 'ongoing', 'processing', 'queued'] as $status) {
+            $order = $this->pendingOrder();
+            Http::fake(['api.paystack.co/transaction/verify/*' => Http::response($this->verified($order, ['status' => $status]))]);
+
+            $this->actingAs($this->student)->get('/checkout/callback?reference=' . $order->reference)
+                ->assertSessionHas('error', fn ($m) => str_contains($m, 'still being processed') && ! str_contains($m, 'not been charged'));
+
+            $this->assertSame(Order::PENDING, $order->fresh()->status, $status);
+        }
+
+        // Then the webhook confirms the transfer.
+        [$body, $sig] = $this->signed(['event' => 'charge.success', 'data' => $this->verified($order)['data']]);
+        $this->webhook($body, $sig)->assertOk();
+        $this->assertSame(Order::PAID, $order->fresh()->status);
+    }
+
+    public function test_when_the_customer_bears_the_card_fee_the_price_must_still_be_paid_in_full(): void
+    {
+        $this->paystackOn();
+        $order = $this->pendingOrder();
+
+        // Paystack charged price + fee (amount) and says the price was requested_amount.
+        Http::fake(['api.paystack.co/transaction/verify/*' => Http::response($this->verified($order, ['amount' => $order->amount * 100 + 15000, 'requested_amount' => $order->amount * 100]))]);
+        $this->actingAs($this->student)->get('/checkout/callback?reference=' . $order->reference)->assertSessionHas('success');
+        $this->assertSame(Order::PAID, $order->fresh()->status);
+    }
+
+    public function test_paying_less_than_the_price_never_unlocks_anything_even_with_a_requested_amount(): void
+    {
+        $this->paystackOn();
+        $order = $this->pendingOrder();
+
+        // Charged less than the price, and a requested_amount that was made to look right.
+        Http::fake(['api.paystack.co/transaction/verify/*' => Http::response($this->verified($order, ['amount' => 100, 'requested_amount' => $order->amount * 100]))]);
+        $this->actingAs($this->student)->get('/checkout/callback?reference=' . $order->reference)->assertSessionHas('error');
+
+        $this->assertNotSame(Order::PAID, $order->fresh()->status);
+    }
+
+    public function test_a_declined_payment_shows_the_banks_reason_as_plain_text(): void
+    {
+        $this->paystackOn();
+        $order = $this->pendingOrder();
+        Http::fake(['api.paystack.co/transaction/verify/*' => Http::response($this->verified($order, ['status' => 'failed', 'gateway_response' => 'Insufficient Funds']))]);
+
+        $this->actingAs($this->student)->get('/checkout/callback?reference=' . $order->reference)
+            ->assertSessionHas('error', fn ($m) => str_contains($m, 'not been charged') && str_contains($m, 'Your bank said: Insufficient Funds.'));
+    }
+
+    public function test_an_overlong_bank_message_is_left_out(): void
+    {
+        $this->paystackOn();
+        $order = $this->pendingOrder();
+        Http::fake(['api.paystack.co/transaction/verify/*' => Http::response($this->verified($order, ['status' => 'failed', 'gateway_response' => str_repeat('x', 200)]))]);
+
+        $this->actingAs($this->student)->get('/checkout/callback?reference=' . $order->reference)
+            ->assertSessionHas('error', fn ($m) => ! str_contains($m, 'Your bank said') && str_contains($m, 'not been charged'));
+    }
+
     public function test_if_paystack_is_unreachable_the_order_stays_open_for_the_webhook(): void
     {
         $this->paystackOn();

@@ -33,7 +33,7 @@
     <section class="card stack" style="gap:14px">
         <h2 class="h2">Payments</h2>
         <div class="alert {{ $paystack ? 'ok' : 'info' }}">
-            @if($paystack)Online payment with Paystack is on.@else Online payment with Paystack is off. To turn it on, put your Paystack secret key in the server's .env file as PAYSTACK_SECRET_KEY.@endif
+            @if($paystack)Online payment with Paystack is on.@else Online payment with Paystack is off. To turn it on, save your Paystack secret key in the <a class="link" href="#paystack">Paystack section</a> below.@endif
             <span style="display:block;font-weight:500;margin-top:4px">In your Paystack dashboard (Settings, API Keys and Webhooks) set the webhook URL to <b>{{ url('/api/webhooks/paystack') }}</b></span>
         </div>
         <p class="small muted">Bank transfer shows the account below to students. Leave any box empty to turn bank transfer off.</p>
@@ -80,6 +80,46 @@
 
     <div><button class="btn btn-p" type="submit">Save settings</button></div>
 </form>
+
+<section class="card stack" style="gap:14px" id="paystack">
+    <div>
+        <h2 class="h2">Paystack key</h2>
+        <p class="small muted">The secret key for taking card, bank and USSD payments. Find it in your Paystack dashboard under Settings, then API Keys &amp; Webhooks. It is kept encrypted and never shown again.</p>
+        <p class="small">
+            @if($paystackKey['on'])
+                <span class="badge {{ $paystackKey['mode'] === 'live' ? 'g' : '' }}">{{ $paystackKey['mode'] === 'live' ? 'Live key' : ($paystackKey['mode'] === 'test' ? 'Test key' : 'Key set') }}</span>
+                In use: <b>sk_&hellip;{{ $paystackKey['tail'] }}</b> ({{ $paystackKey['source'] === 'settings' ? 'saved here' : 'from the server\'s .env file' }}).
+                @if($paystackKey['mode'] === 'test') Test payments use no real money.@endif
+            @else
+                <span class="badge">Not set</span> Students can only pay by bank transfer until you save a key.
+            @endif
+        </p>
+    </div>
+
+    <form method="POST" action="{{ route('console.settings.paystack') }}" class="stack" style="gap:14px" autocomplete="off">
+        @csrf @method('PUT')
+        <div class="field">
+            <label for="paystack_secret">{{ $paystackKey['on'] ? 'Replace the secret key' : 'Secret key' }}</label>
+            <input id="paystack_secret" name="paystack_secret" type="password" class="input" required autocomplete="new-password" placeholder="sk_live_... or sk_test_..." spellcheck="false">
+            <p class="small muted">Use a <b>test</b> key (sk_test_) to try it without real money, then the <b>live</b> key (sk_live_) when you are ready.</p>
+        </div>
+        <div class="row wrap" style="gap:10px"><button class="btn btn-p" type="submit">Save key</button></div>
+    </form>
+
+    <div class="alert info" style="margin:0">
+        Also set the webhook in your Paystack dashboard (test and live are separate): <b>{{ url('/api/webhooks/paystack') }}</b><br>
+        Callback address (optional, the site sends its own): <b>{{ route('checkout.callback') }}</b>
+    </div>
+
+    @if($paystackKey['on'])
+    <div class="row wrap" style="gap:10px">
+        <form method="POST" action="{{ route('console.settings.paystack.check') }}">@csrf <button class="btn btn-o" type="submit">Check the key</button></form>
+        @if($paystackKey['source'] === 'settings')
+        <form method="POST" action="{{ route('console.settings.paystack') }}">@csrf @method('PUT') <input type="hidden" name="forget_paystack" value="1"><button class="btn btn-d" type="submit" data-confirm="Online payment stops working unless the server's .env file has a key." data-confirm-title="Remove the saved Paystack key?" data-confirm-label="Remove" data-confirm-tone="danger">Remove the saved key</button></form>
+        @endif
+    </div>
+    @endif
+</section>
 
 <section class="card stack" style="gap:14px" id="email">
     <div>

@@ -9,6 +9,7 @@ use App\Models\Setting;
 use App\Models\Subject;
 use App\Services\MailSettings;
 use App\Services\PackBuilder;
+use App\Services\PaystackSettings;
 use Illuminate\Http\Request;
 
 /** Site-wide settings an admin can change without a developer. */
@@ -44,6 +45,7 @@ class SettingsController extends Controller
         return view('console.settings', [
             'values' => collect(array_keys(self::FIELDS))->mapWithKeys(fn ($key) => [$key => Setting::get($key, '')])->all(),
             'paystack' => \App\Services\Payments\Paystack::configured(),
+            'paystackKey' => app(PaystackSettings::class)->form(),
             'apk' => \App\Http\Controllers\Site\HomeController::apkFiles(),
             'uploadLimit' => self::uploadLimitBytes(),
             'mail' => app(MailSettings::class)->form(),
@@ -86,6 +88,33 @@ class SettingsController extends Controller
         }
 
         return back()->with('success', 'Settings saved.');
+    }
+
+    /** The Paystack secret key. Kept encrypted; a blank box changes nothing; "remove" goes back to the one in .env, if any. */
+    public function paystack(Request $request, PaystackSettings $paystack)
+    {
+        if ($request->boolean('forget_paystack')) {
+            $paystack->clear();
+
+            return redirect()->to(route('console.settings.edit') . '#paystack')->with('success', 'The saved Paystack key was removed.');
+        }
+
+        $data = $request->validate(['paystack_secret' => ['required', 'string', 'max:200', 'regex:' . PaystackSettings::PATTERN]], [
+            'paystack_secret.required' => 'Paste your Paystack secret key.',
+            'paystack_secret.regex' => 'That does not look like a Paystack secret key. It starts with sk_live_ or sk_test_ (not pk_, which is the public key).',
+        ]);
+
+        $paystack->save($data['paystack_secret']);
+
+        return redirect()->to(route('console.settings.edit') . '#paystack')->with('success', 'Paystack key saved. Press "Check the key" to make sure Paystack accepts it.');
+    }
+
+    /** Asks Paystack whether the key works, without charging anything. */
+    public function paystackCheck(PaystackSettings $paystack)
+    {
+        $problem = $paystack->check();
+
+        return redirect()->to(route('console.settings.edit') . '#paystack')->with($problem ? 'error' : 'success', $problem ?? 'Paystack accepted the key. Online payment is ready.');
     }
 
     /** The outgoing email account. A blank password keeps the saved one; the password is never shown again. */

@@ -39,6 +39,7 @@ class AppServiceProvider extends ServiceProvider
     // The email account an admin saved in Site settings. A missing settings table (before the first migration) must not stop the app.
     try {
         app(\App\Services\MailSettings::class)->apply();
+        app(\App\Services\PaystackSettings::class)->apply();
     } catch (\Throwable) {
     }
 

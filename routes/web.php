@@ -128,6 +128,8 @@ Route::middleware(['auth'])->group(function () {
             Route::resource('events', Console\EventController::class)->except('show');
             Route::get('settings', [Console\SettingsController::class, 'edit'])->name('settings.edit');
             Route::put('settings', [Console\SettingsController::class, 'update'])->name('settings.update');
+            Route::put('settings/paystack', [Console\SettingsController::class, 'paystack'])->name('settings.paystack');
+            Route::post('settings/paystack/check', [Console\SettingsController::class, 'paystackCheck'])->middleware('throttle:5,1')->name('settings.paystack.check');
             Route::put('settings/mail', [Console\SettingsController::class, 'mail'])->name('settings.mail');
             Route::post('settings/mail/test', [Console\SettingsController::class, 'testMail'])->middleware('throttle:5,1')->name('settings.mail.test');
 
