@@ -2,7 +2,7 @@
   "expo": {
     "name": "TestaCBT",
     "slug": "testacbt",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "testacbt",
@@ -14,6 +14,7 @@
     },
     "android": {
       "package": "com.testacbt.app",
+      "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#0A7A4A",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
