@@ -23,7 +23,10 @@ yarn-error.log
 /.zed
 .env.clone
 
-# An Android app uploaded in the console. The release build (public/downloads/TestaCBT.apk) is committed on purpose.
+# The Android app is not kept in git (every build adds about 60 MB to the history). Build it on a computer with
+# `node scripts/build-apk.mjs`, then upload the .apk in Content > Site settings > App downloads.
+/public/downloads/TestaCBT.apk
+/public/downloads/TestaCBT.json
 /public/downloads/TestaCBT-upload.apk
 
 # Database dumps taken before risky changes: they hold real student data, never commit them.

@@ -1,6 +1,6 @@
 // Builds the signed Android app (.apk) on this computer and puts it where the website serves it:
 //   node scripts/build-apk.mjs
-// which writes ../public/downloads/TestaCBT.apk (+ TestaCBT.json with the version), ready to commit and pull on the server.
+// which writes ../public/downloads/TestaCBT.apk (+ TestaCBT.json with the version), ready to upload in the console (Content > Site settings > App downloads). It is not kept in git.
 //
 // One-time setup (not stored in the repository):
 //   * JDK 17 or newer, and the Android SDK (Android Studio installs both).

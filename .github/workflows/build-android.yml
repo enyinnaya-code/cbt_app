@@ -1,7 +1,8 @@
 # Builds the signed Android app (.apk) on GitHub's servers, so it does not need to be built on a laptop.
 # Run it from the repository's Actions tab: "Build Android app" > "Run workflow".
-# When it finishes, the app is saved as public/downloads/TestaCBT.apk in the repository, so a `git pull` on the
-# server puts it on the website. It is also attached to the run as a download.
+# When it finishes, the app is attached to the run as a download (Actions > the run > Artifacts). It is NOT saved in the
+# repository, which would add about 60 MB to its history on every build. Upload the downloaded .apk on the website in
+# Content > Site settings > App downloads, with its version number.
 #
 # One-time setup: Settings > Secrets and variables > Actions > New repository secret, four times over:
 #   ANDROID_KEYSTORE_BASE64     the signing key file, as text (see mobile/README.md, "Building the app online")
@@ -12,14 +13,9 @@ name: Build Android app
 
 on:
   workflow_dispatch:
-    inputs:
-      commit:
-        description: Save the finished app into the repository (public/downloads)
-        type: boolean
-        default: true
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: build-android
@@ -86,14 +82,3 @@ jobs:
             public/downloads/TestaCBT.apk
             public/downloads/TestaCBT.json
           if-no-files-found: error
-
-      - name: Save the app in the repository
-        if: ${{ inputs.commit }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/downloads/TestaCBT.apk public/downloads/TestaCBT.json
-          if git diff --cached --quiet; then echo "No change to save."; exit 0; fi
-          git commit -m "Build the Android app (GitHub Actions run ${{ github.run_number }})"
-          git pull --rebase origin "${{ github.ref_name }}"
-          git push origin "HEAD:${{ github.ref_name }}"

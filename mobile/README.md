@@ -63,7 +63,11 @@ node scripts/make-starter.mjs --from-api https://testacbt.com/api/v1 --token <to
 
 ## Building the app online (GitHub Actions)
 
-`.github/workflows/build-android.yml` builds the signed `.apk` on GitHub's servers and saves it as `public/downloads/TestaCBT.apk`, so nothing needs to be built on a laptop and a `git pull` on the server puts it on the website.
+`.github/workflows/build-android.yml` builds the signed `.apk` on GitHub's servers and attaches it to the run (Actions, the run, Artifacts). It is not saved in the repository.
+
+The quicker way, if the computer has Java and the Android SDK: `node scripts/build-apk.mjs` in the `mobile` folder builds the same signed app in `public/downloads/` (the first build takes about 30 minutes, later ones less).
+
+Either way, put the app on the website by uploading the `.apk` in the console: Content, Site settings, App downloads, and type its version (for example 1.2.0). The server's PHP upload limit must allow about 65 MB. The app and its update banner use that version.
 
 One-time setup, in the repository on GitHub: Settings, Secrets and variables, Actions, New repository secret. Add four secrets:
 
@@ -80,7 +84,7 @@ To copy the key file as text (PowerShell), then paste into the first secret:
 [Convert]::ToBase64String([IO.File]::ReadAllBytes("$env:USERPROFILE\.testacbt\testacbt-release.jks")) | Set-Clipboard
 ```
 
-Then Actions, "Build Android app", Run workflow. It takes about 15 to 25 minutes. Use the same key every time: an installed app can only be updated by a build signed with the key it was first installed with. The workflow only runs when started by hand, because every saved build adds tens of megabytes to the repository's history.
+Then Actions, "Build Android app", Run workflow. It takes about 15 to 25 minutes. Use the same key every time: an installed app can only be updated by a build signed with the key it was first installed with. The workflow only runs when started by hand.
 
 ## Releasing
 
