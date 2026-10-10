@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Student;
 
 use App\Http\Controllers\Controller;
-use App\Models\Entitlement;
 use App\Models\Order;
 use App\Services\Payments\BankTransfer;
+use App\Services\Purchases;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -14,11 +14,25 @@ class OrderController extends Controller
     /** My purchases, and what is unlocked until when. */
     public function index(Request $request)
     {
-        $user = $request->user();
+        $purchases = new Purchases($request->user());
 
         return view('student.orders', [
-            'orders' => Order::where('user_id', $user->id)->with(['exam:id,name', 'items.subject:id,name'])->latest('id')->limit(50)->get(),
-            'entitlements' => Entitlement::active()->where('user_id', $user->id)->with(['exam:id,name', 'subject:id,name'])->orderBy('expires_at')->get(),
+            'orders' => $purchases->orders(),
+            'unlocked' => $purchases->unlocked(),
+            'remindDays' => Purchases::REMIND_DAYS,
+        ]);
+    }
+
+    /** A printable receipt for a payment that went through. Only the person who paid can open it. */
+    public function receipt(Request $request, string $reference)
+    {
+        $order = $this->mine($request, $reference);
+        abort_unless($order->isPaid(), 404);
+
+        return view('student.receipt', [
+            'order' => $order->load(['exam:id,name', 'items.subject:id,name']),
+            'user' => $request->user(),
+            'until' => $order->paid_at->copy()->addDays($order->access_days),
         ]);
     }
 

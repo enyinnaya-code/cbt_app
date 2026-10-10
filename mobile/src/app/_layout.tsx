@@ -68,6 +68,7 @@ function Shell() {
           <Stack.Screen name="mock/result" options={{ gestureEnabled: false }} />
           <Stack.Screen name="saved" options={{ animation: 'slide_from_right' }} />
           <Stack.Screen name="downloads" options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="purchases" options={{ animation: 'slide_from_right' }} />
           <Stack.Screen name="rankings/index" options={{ animation: 'slide_from_right' }} />
           <Stack.Screen name="rankings/join" options={{ animation: 'slide_from_bottom' }} />
         </Stack.Protected>

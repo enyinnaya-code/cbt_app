@@ -13,6 +13,15 @@
 </div>
 <p class="small muted" style="margin-top:-4px">{{ $message }}</p>
 
+@foreach($endingSoon as $e)
+    @php $left = \App\Services\Purchases::daysLeft($e); @endphp
+    <div class="card row between wrap" style="background:var(--accent-soft);border:0">
+        <div><p class="h3">{{ $e->subject->name }} ends {{ $left <= 0 ? 'today' : 'in ' . $left . ' ' . \Illuminate\Support\Str::plural('day', $left) }}</p>
+            <p class="small">Renew now to keep every question. Your progress stays either way.</p></div>
+        <a class="btn btn-p btn-sm" href="{{ \App\Services\Purchases::renewUrl($e) }}">Renew</a>
+    </div>
+@endforeach
+
 <div class="grid2">
     {{-- Countdown and streak --}}
     <div class="card primary">

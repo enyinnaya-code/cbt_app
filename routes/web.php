@@ -149,6 +149,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/checkout', [Student\CheckoutController::class, 'store'])->middleware('throttle:10,1')->name('checkout.store');
     Route::get('/orders', [Student\OrderController::class, 'index'])->name('orders.index');
     Route::get('/orders/{reference}', [Student\OrderController::class, 'show'])->name('orders.show');
+    Route::get('/orders/{reference}/receipt', [Student\OrderController::class, 'receipt'])->name('orders.receipt');
     Route::post('/orders/{reference}/paid', [Student\OrderController::class, 'submitProof'])->middleware('throttle:10,1')->name('orders.proof');
     Route::post('/orders/{reference}/cancel', [Student\OrderController::class, 'cancel'])->name('orders.cancel');
 

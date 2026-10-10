@@ -117,7 +117,8 @@ export default function Profile() {
       <View>
         <Row2 icon="bookmark" title="Saved questions" onPress={() => router.push('/saved')} />
         <Row2 icon="download" title="Manage downloads" onPress={() => router.push('/downloads')} />
-        <Row2 icon="card" title="Unlock subjects and purchases" onPress={() => void unlockOnWebsite({ page: '/orders' })} />
+        <Row2 icon="card" title="My purchases" onPress={() => router.push('/purchases' as never)} />
+        <Row2 icon="lock" title="Unlock more subjects" onPress={() => void unlockOnWebsite()} />
       </View>
 
       <Badge label={`TestaCBT ${INSTALLED_VERSION}`} kind="neutral" />

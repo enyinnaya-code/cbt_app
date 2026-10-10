@@ -3,7 +3,11 @@ import { useMemo } from 'react';
 import { Alert, Linking, View } from 'react-native';
 import { CHALLENGE } from '@/core/challenge';
 import { ago, daysUntil, greeting, initials, plural } from '@/core/format';
+import { endingSoon, pendingUpgrades } from '@/core/purchases';
 import { INSTALLED_VERSION } from '@/core/version';
+import { buildViews } from '@/core/views';
+import { startDownload } from '@/ui/downloads';
+import { unlockOnWebsite } from '@/ui/unlock';
 import { bookmarkedIds, lastPractised, streak, subjectStats } from '@/db/progress';
 import { useFocusLoad } from '@/hooks/useFocusLoad';
 import { checkForUpdate, dismissUpdate } from '@/services/appUpdate';
@@ -46,6 +50,10 @@ export default function Home() {
     }
   };
 
+  // What the student bought but the phone does not have yet, and what is about to run out.
+  const upgrades = useMemo(() => pendingUpgrades(buildViews(catalog, installed)), [catalog, installed]);
+  const ending = useMemo(() => endingSoon(catalog), [catalog]);
+
   const left = daysUntil(targetExamDate);
   const examName = useMemo(() => catalog?.exams.find((e) => e.slug === targetExam)?.name ?? targetExam?.toUpperCase() ?? 'Your exam', [catalog, targetExam]);
   const stats = data?.stats ?? [];
@@ -85,6 +93,22 @@ export default function Home() {
           </Row>
         </Card>
       ) : null}
+
+      {upgrades.map((s) => (
+        <Card key={`${s.examSlug}/${s.slug}`} style={{ gap: 8, backgroundColor: c.accentSoft, borderColor: c.accentSoft }}>
+          <T variant="h3">{s.name}: your full questions are ready</T>
+          <T variant="small">You unlocked it, but this phone still has the free sample. Download the full set to use every question.</T>
+          <Button full={false} icon="download" label="Download the full set" onPress={() => startDownload(s)} />
+        </Card>
+      ))}
+
+      {ending.map((e) => (
+        <Card key={`${e.examSlug}/${e.subjectSlug}`} style={{ gap: 8, backgroundColor: c.accentSoft, borderColor: c.accentSoft }}>
+          <T variant="h3">{e.subject} ends {e.days <= 1 ? 'tomorrow' : `in ${e.days} days`}</T>
+          <T variant="small">Renew to keep every question. Your progress stays either way.</T>
+          <Button full={false} small label="Renew" icon="lock" onPress={() => void unlockOnWebsite({ exam: e.examSlug, subject: e.subjectSlug })} />
+        </Card>
+      ))}
 
       <Card kind="primary">
         {left !== null ? (

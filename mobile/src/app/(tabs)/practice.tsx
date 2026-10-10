@@ -122,6 +122,14 @@ export default function Practice() {
         onClose={() => setOpen(false)}
         footer={<Button label={`Start ${count} questions`} onPress={start} />}
       >
+        {subject && !subject.locked && subject.updateAvailable && subject.installed?.tier === 'free' ? (
+          <Card style={{ gap: 8, backgroundColor: c.accentSoft, borderColor: c.accentSoft }}>
+            <T variant="h3">Your full questions are ready</T>
+            <T variant="small">You unlocked {subject.name}, but this phone still has the free sample ({subject.installed.question_count} questions).</T>
+            <Button full={false} icon="download" label={`Download the full set${subject.offered ? ` (${formatBytes(subject.offered.size_bytes)})` : ''}`} onPress={() => startDownload(subject)} />
+          </Card>
+        ) : null}
+
         {subject?.locked ? (
           <Card style={{ gap: 10, backgroundColor: c.accentSoft, borderColor: c.accentSoft }}>
             <T variant="h3">You are using the free sample of {subject.name}</T>

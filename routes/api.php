@@ -31,6 +31,7 @@ Route::prefix('v1')->group(function () {
         Route::put('/leaderboard/profile', [\App\Http\Controllers\Api\V1\LeaderboardController::class, 'join'])->middleware('throttle:20,1');
         Route::delete('/leaderboard/profile', [\App\Http\Controllers\Api\V1\LeaderboardController::class, 'leave'])->middleware('throttle:20,1');
         Route::get('/leaderboard', [\App\Http\Controllers\Api\V1\LeaderboardController::class, 'board']);
+        Route::get('/purchases', \App\Http\Controllers\Api\V1\PurchasesController::class);
         Route::get('/me/settings', [\App\Http\Controllers\Api\V1\SettingsController::class, 'show']);
         Route::put('/me/settings', [\App\Http\Controllers\Api\V1\SettingsController::class, 'update']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);

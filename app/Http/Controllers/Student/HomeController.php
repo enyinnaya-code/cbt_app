@@ -41,6 +41,7 @@ class HomeController extends Controller
             'answered' => $stats->totalAnswered(),
             'level' => $engagement->level(),
             'xpToday' => $engagement->xpToday(),
+            'endingSoon' => (new \App\Services\Purchases($user))->endingSoon(),
             'joined' => $joined,
             'challenge' => $joined ? $challenge->today() : null,
             'nickname' => $user->nickname,

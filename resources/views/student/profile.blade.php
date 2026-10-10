@@ -9,6 +9,7 @@
 @endphp
 
 @section('content')
+@php $unlockedCount = \App\Models\Entitlement::active()->where('user_id', $user->id)->count(); @endphp
 <h1 class="h1">Profile</h1>
 
 <div class="row">
@@ -74,6 +75,11 @@
         <button type="button" data-theme-val="dark">Dark</button>
     </div>
 </div>
+
+<section class="card row between wrap">
+    <div><h2 class="h2">My purchases</h2><p class="small muted">{{ $unlockedCount ? $unlockedCount . ' ' . \Illuminate\Support\Str::plural('subject', $unlockedCount) . ' unlocked. See when each ends, and print receipts.' : 'See what you have unlocked and your payments.' }}</p></div>
+    <a class="btn btn-o" href="{{ route('orders.index') }}"><x-icon name="card" size="s"/>Open</a>
+</section>
 
 <section class="card stack" style="gap:16px">
     <h2 class="h2">{{ $user->password ? 'Change password' : 'Set a password' }}</h2>

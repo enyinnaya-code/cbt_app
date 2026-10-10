@@ -7,6 +7,7 @@ import type { Catalog, CatalogSubject } from '@/core/types';
 import { kvGet, kvSet } from '@/db/progress';
 import { ApiError } from '@/services/api';
 import { CatalogIndex, cachedCatalog, refreshCatalog } from '@/services/catalog';
+import { replaceNow } from '@/core/purchases';
 import { PackError, type PackMeta } from '@/services/packs';
 import { services } from './services';
 import { useSettings } from './settings';
@@ -93,13 +94,17 @@ export const useData = create<DataState>((set, get) => ({
   async syncTiers() {
     const { catalog, online, onWifi } = get();
     if (!catalog || !online) return;
-    if (useSettings.getState().wifiOnly && !onWifi) return;
+    const wifiOnly = useSettings.getState().wifiOnly;
 
     const installed = await services().packs.installed();
     for (const exam of catalog.exams) {
       for (const subject of exam.subjects) {
         const have = installed.find((i) => i.exam_slug === exam.slug && i.subject_slug === subject.slug);
-        if (have && !have.starter && subject.pack && (subject.pack.tier ?? 'full') !== have.tier) void get().download(exam.slug, subject);
+        if (!have || have.starter || !subject.pack || (subject.pack.tier ?? 'full') === have.tier) continue;
+
+        // The student has just paid (or a purchase has just ended), so waiting for Wi-Fi would leave them looking at the
+        // old set of questions for no reason. Small sets go straight away; a big one on mobile data is offered on Home.
+        if (replaceNow(subject.pack.size_bytes, wifiOnly, onWifi)) void get().download(exam.slug, subject);
       }
     }
   },

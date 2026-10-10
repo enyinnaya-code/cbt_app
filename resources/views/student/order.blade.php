@@ -15,7 +15,7 @@
 @if($order->isPaid())
     <div class="card row between wrap" style="background:var(--primary-soft);border:0">
         <div><p class="h3">Unlocked</p><p class="small">Paid {{ $order->paid_at->format('j F Y g:i a') }}. Your subjects now have every question.</p></div>
-        <a class="btn btn-p" href="{{ route('practice.index', ['exam' => $order->exam->slug]) }}">Start practising</a>
+        <div class="row wrap" style="gap:8px"><a class="btn btn-o" href="{{ route('orders.receipt', $order->reference) }}">View receipt</a><a class="btn btn-p" href="{{ route('practice.index', ['exam' => $order->exam->slug]) }}">Start practising</a></div>
     </div>
 @elseif($order->status === 'rejected')
     <div class="alert err" role="alert"><p><b>We could not confirm this transfer.</b></p>@if($order->decision_note)<p style="font-weight:500;margin-top:4px">{{ $order->decision_note }}</p>@endif</div>
