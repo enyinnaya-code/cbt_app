@@ -163,4 +163,29 @@ class PaystackSettingsTest extends TestCase
         $this->actingAs($this->makeUser(1))->get(route('console.settings.edit'))->assertOk()
             ->assertSee('Paystack key')->assertSee('Not set')->assertSee(url('/api/webhooks/paystack'))->assertSee(route('checkout.callback'));
     }
+
+    public function test_the_check_uses_a_reference_made_of_plain_letters(): void
+    {
+        $this->save($this->live);
+        Http::fake(['api.paystack.co/*' => Http::response(['status' => false, 'message' => 'Transaction reference not found.'], 404)]);
+
+        app(PaystackSettings::class)->check();
+
+        Http::assertSent(fn ($r) => str_ends_with($r->url(), '/transaction/verify/doesnotexist'));
+    }
+
+    public function test_an_unexpected_answer_shows_what_paystack_said_as_plain_text(): void
+    {
+        $this->save($this->live);
+        Http::fake(['api.paystack.co/*' => Http::response(['status' => false, 'message' => 'Invalid reference <b>x</b>'], 400)]);
+
+        $message = (string) app(PaystackSettings::class)->check();
+
+        $this->assertStringContainsString('(400)', $message);
+        $this->assertStringContainsString('Invalid reference', $message);
+
+        // Shown through Blade it is escaped; and a very long message is cut short.
+        Http::fake(['api.paystack.co/*' => Http::response(['status' => false, 'message' => str_repeat('x', 500)], 400)]);
+        $this->assertLessThan(260, mb_strlen((string) app(PaystackSettings::class)->check()));
+    }
 }

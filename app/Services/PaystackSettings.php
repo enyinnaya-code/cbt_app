@@ -14,6 +14,9 @@ use Illuminate\Support\Facades\Http;
  */
 class PaystackSettings
 {
+    /** A payment reference that does not exist, in the plain letters-only form Paystack answers with "not found". */
+    public const PROBE = 'doesnotexist';
+
     public const PATTERN = '/^sk_(test|live)_[A-Za-z0-9]{10,}$/';
 
     public function saved(): ?string
@@ -71,7 +74,7 @@ class PaystackSettings
 
         try {
             $response = Http::withToken($key)->baseUrl(rtrim((string) config('services.paystack.base_url'), '/'))
-                ->acceptJson()->timeout(15)->get('/transaction/verify/' . 'testacbt-key-check');
+                ->acceptJson()->timeout(15)->get('/transaction/verify/' . self::PROBE);
         } catch (ConnectionException) {
             return 'Could not reach Paystack from this server. Check the server\'s internet connection and firewall.';
         }
@@ -79,7 +82,15 @@ class PaystackSettings
         return match (true) {
             $response->status() === 401 => 'Paystack refused this key. Copy the secret key again from Settings, API Keys & Webhooks.',
             $response->status() === 404 || $response->successful() => null,
-            default => 'Paystack answered unexpectedly (' . $response->status() . '). Try again in a moment.',
+            default => 'Paystack answered unexpectedly (' . $response->status() . ')' . $this->reason($response) . '. Try again in a moment.',
         };
+    }
+
+    /** Paystack's own short explanation, as plain text, when it gives one. */
+    private function reason($response): string
+    {
+        $message = trim((string) $response->json('message'));
+
+        return $message === '' ? '' : ': "' . mb_substr(preg_replace('/\s+/', ' ', $message), 0, 120) . '"';
     }
 }
