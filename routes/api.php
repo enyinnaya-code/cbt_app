@@ -16,6 +16,9 @@ Route::prefix('v1')->group(function () {
 
     Route::get('/ping', fn () => response()->json(['ok' => true, 'time' => now()->toIso8601String()]));
 
+    // The newest app version on offer, so an older app can show an "update available" banner. Public.
+    Route::get('/app-version', \App\Http\Controllers\Api\V1\AppVersionController::class)->middleware('throttle:30,1');
+
     Route::middleware('throttle:10,1')->prefix('auth')->group(function () {
         Route::post('/register', [AuthController::class, 'register']);
         Route::post('/login', [AuthController::class, 'login']);

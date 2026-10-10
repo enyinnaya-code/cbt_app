@@ -1,10 +1,12 @@
 import { router } from 'expo-router';
 import { useMemo } from 'react';
-import { View } from 'react-native';
+import { Alert, Linking, View } from 'react-native';
 import { CHALLENGE } from '@/core/challenge';
 import { ago, daysUntil, greeting, initials, plural } from '@/core/format';
+import { INSTALLED_VERSION } from '@/core/version';
 import { bookmarkedIds, lastPractised, streak, subjectStats } from '@/db/progress';
 import { useFocusLoad } from '@/hooks/useFocusLoad';
+import { checkForUpdate, dismissUpdate } from '@/services/appUpdate';
 import { todaysChallenge } from '@/services/challenge';
 import { isJoined } from '@/services/rankings';
 import { engagement } from '@/services/engagement';
@@ -24,16 +26,25 @@ export default function Home() {
   const catalog = useData((s) => s.catalog);
   const { targetExam, targetExamDate } = useSettings();
 
-  const { data } = useFocusLoad(async () => {
+  const { data, reload } = useFocusLoad(async () => {
     const { db } = services();
     // The daily challenge feeds the rankings, so it is opt-in: only students who joined get one.
     const joined = await isJoined(db);
-    const [stats, days, last, saved, level, challenge] = await Promise.all([
+    const [stats, days, last, saved, level, challenge, update] = await Promise.all([
       subjectStats(db), streak(db), lastPractised(db), bookmarkedIds(db), engagement(db),
       joined ? todaysChallenge(db, services().packs, String(user?.id ?? ''), targetExam) : Promise.resolve(null),
+      checkForUpdate(db, services().api, INSTALLED_VERSION),
     ]);
-    return { stats, days, last, saved: saved.size, level, challenge, joined };
+    return { stats, days, last, saved: saved.size, level, challenge, joined, update };
   });
+
+  const openUpdate = async (url: string) => {
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Could not open the page', 'Please try again in a moment, or open the TestaCBT website to download the new version.');
+    }
+  };
 
   const left = daysUntil(targetExamDate);
   const examName = useMemo(() => catalog?.exams.find((e) => e.slug === targetExam)?.name ?? targetExam?.toUpperCase() ?? 'Your exam', [catalog, targetExam]);
@@ -60,6 +71,20 @@ export default function Home() {
         </Row>
         <Badge label={online ? 'Online' : 'Offline'} kind={online ? 'neutral' : 'green'} icon={online ? 'wifi' : 'wifioff'} />
       </Row>
+
+      {data?.update ? (
+        <Card style={{ gap: 10, backgroundColor: c.accentSoft, borderColor: c.accentSoft }}>
+          <Row>
+            <Icon name="download" size={18} color={c.accentInk} />
+            <T variant="h3" style={{ flex: 1 }}>A new version is ready</T>
+          </Row>
+          <T variant="small">TestaCBT {data.update.latest} has new features. You have {INSTALLED_VERSION}. Your progress and downloads stay safe when you update.</T>
+          <Row wrap style={{ gap: 8 }}>
+            <Button full={false} label="Update now" icon="download" onPress={() => void openUpdate(data.update!.url)} />
+            <Button full={false} variant="outline" label="Later" onPress={() => { void dismissUpdate(services().db, data.update!.latest).then(reload); }} />
+          </Row>
+        </Card>
+      ) : null}
 
       <Card kind="primary">
         {left !== null ? (

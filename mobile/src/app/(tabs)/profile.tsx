@@ -9,6 +9,7 @@ import { useData } from '@/state/data';
 import { services } from '@/state/services';
 import { useSession } from '@/state/session';
 import { useSettings } from '@/state/settings';
+import { INSTALLED_VERSION } from '@/core/version';
 import { Avatar, Badge, Banner, Button, Card, Chip, Field, Row, Screen, Segmented, T } from '@/ui/components';
 import { Icon, type IconName } from '@/ui/Icon';
 import { useTheme } from '@/ui/theme';
@@ -119,7 +120,7 @@ export default function Profile() {
         <Row2 icon="card" title="Unlock subjects and purchases" onPress={() => void unlockOnWebsite({ page: '/orders' })} />
       </View>
 
-      <Badge label={`TestaCBT ${require('../../../app.json').expo.version}`} kind="neutral" />
+      <Badge label={`TestaCBT ${INSTALLED_VERSION}`} kind="neutral" />
       <Button label="Sign out" variant="danger" icon="logout" onPress={signOut} />
       <T variant="tiny" muted style={{ textAlign: 'center' }}>A product of Node Netcad Enterprise</T>
     </Screen>
