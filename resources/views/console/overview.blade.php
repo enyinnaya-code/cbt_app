@@ -8,6 +8,8 @@
     <a class="btn btn-p" href="{{ route('console.papers.create') }}"><x-icon name="plus" size="s"/>New paper</a>
 </div>
 
+@include('student._notices')
+
 @if($legacy > 0)
     <a class="card row between" href="{{ route('console.legacy.index') }}" style="border-color:var(--accent)">
         <div class="row grow"><span class="sq c-a"><x-icon name="refresh"/></span>

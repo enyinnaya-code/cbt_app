@@ -11,6 +11,7 @@ import { unlockOnWebsite } from '@/ui/unlock';
 import { bookmarkedIds, lastPractised, streak, subjectStats } from '@/db/progress';
 import { useFocusLoad } from '@/hooks/useFocusLoad';
 import { checkForUpdate, dismissUpdate } from '@/services/appUpdate';
+import { closeNotice, currentNotices, safeLink } from '@/services/notices';
 import { todaysChallenge } from '@/services/challenge';
 import { isJoined } from '@/services/rankings';
 import { engagement } from '@/services/engagement';
@@ -34,12 +35,13 @@ export default function Home() {
     const { db } = services();
     // The daily challenge feeds the rankings, so it is opt-in: only students who joined get one.
     const joined = await isJoined(db);
-    const [stats, days, last, saved, level, challenge, update] = await Promise.all([
+    const [stats, days, last, saved, level, challenge, update, notices] = await Promise.all([
       subjectStats(db), streak(db), lastPractised(db), bookmarkedIds(db), engagement(db),
       joined ? todaysChallenge(db, services().packs, String(user?.id ?? ''), targetExam) : Promise.resolve(null),
       checkForUpdate(db, services().api, INSTALLED_VERSION),
+      currentNotices(db, services().api),
     ]);
-    return { stats, days, last, saved: saved.size, level, challenge, joined, update };
+    return { stats, days, last, saved: saved.size, level, challenge, joined, update, notices };
   });
 
   const openUpdate = async (url: string) => {
@@ -79,6 +81,21 @@ export default function Home() {
         </Row>
         <Badge label={online ? 'Online' : 'Offline'} kind={online ? 'neutral' : 'green'} icon={online ? 'wifi' : 'wifioff'} />
       </Row>
+
+      {data?.notices.map((n) => {
+        const link = safeLink(n.link_url);
+        const bg = n.tone === 'warning' ? c.accentSoft : n.tone === 'success' ? c.primarySoft : c.blueSoft;
+        return (
+          <Card key={n.id} style={{ gap: 8, backgroundColor: bg, borderColor: bg }}>
+            <Row between style={{ alignItems: 'flex-start' }}>
+              <T variant="h3" style={{ flex: 1 }}>{n.title}</T>
+              <IconButton icon="x" label="Close this announcement" size={34} bg="transparent" onPress={() => { void closeNotice(services().db, n.id).then(reload); }} />
+            </Row>
+            {n.body ? <T variant="small">{n.body}</T> : null}
+            {link ? <Button full={false} small label={n.link_label || 'Read more'} onPress={() => void openUpdate(link)} /> : null}
+          </Card>
+        );
+      })}
 
       {data?.update ? (
         <Card style={{ gap: 10, backgroundColor: c.accentSoft, borderColor: c.accentSoft }}>

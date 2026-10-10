@@ -126,6 +126,8 @@ Route::middleware(['auth'])->group(function () {
             Route::resource('posts', Console\PostController::class)->except('show');
             Route::resource('videos', Console\VideoController::class)->except('show');
             Route::resource('events', Console\EventController::class)->except('show');
+            Route::resource('notices', Console\NoticeController::class)->except('show');
+            Route::patch('notices/{notice}/toggle', [Console\NoticeController::class, 'toggle'])->name('notices.toggle');
             Route::get('settings', [Console\SettingsController::class, 'edit'])->name('settings.edit');
             Route::put('settings', [Console\SettingsController::class, 'update'])->name('settings.update');
             Route::put('settings/paystack', [Console\SettingsController::class, 'paystack'])->name('settings.paystack');

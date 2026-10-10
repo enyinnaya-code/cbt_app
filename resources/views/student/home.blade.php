@@ -13,6 +13,8 @@
 </div>
 <p class="small muted" style="margin-top:-4px">{{ $message }}</p>
 
+@include('student._notices')
+
 @foreach($endingSoon as $e)
     @php $left = \App\Services\Purchases::daysLeft($e); @endphp
     <div class="card row between wrap" style="background:var(--accent-soft);border:0">
