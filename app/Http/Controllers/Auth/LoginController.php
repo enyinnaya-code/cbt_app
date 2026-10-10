@@ -29,25 +29,33 @@ class LoginController extends Controller
         // which on a public app would let anyone lock other people out.
         $throttleKey = Str::lower($request->email) . '|' . $request->ip();
 
-        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
-            $seconds = RateLimiter::availableIn($throttleKey);
-            return back()->with('error', "Too many attempts. Try again in {$seconds} seconds.");
-        }
+        // One address trying many different accounts is also stopped, not only many tries on one account.
+        $ipKey = 'login-ip|' . $request->ip();
 
-        $user = User::where('email', $request->email)->first();
-
-        // Admin-suspended accounts (and any locked by the old rule) stay blocked until re-activated.
-        if ($user && $user->is_active == 0) {
-            return back()->with('error', 'Your account is suspended.');
+        foreach ([[$throttleKey, 5], [$ipKey, 30]] as [$key, $max]) {
+            if (RateLimiter::tooManyAttempts($key, $max)) {
+                $seconds = RateLimiter::availableIn($key);
+                return back()->with('error', "Too many attempts. Try again in {$seconds} seconds.");
+            }
         }
 
         if (Auth::attempt($request->only('email', 'password'), $request->filled('remember'))) {
+            // Admin-suspended accounts stay blocked until re-activated. This is only said to someone who knows the password,
+            // so the sign-in page cannot be used to find out which emails have accounts.
+            if ((int) Auth::user()->is_active === 0) {
+                Auth::logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+                return back()->with('error', 'Your account is suspended.');
+            }
+
             RateLimiter::clear($throttleKey);
             $request->session()->regenerate(); // Prevent session fixation
             return redirect()->route('dashboard');
         }
 
         RateLimiter::hit($throttleKey, 60);
+        RateLimiter::hit($ipKey, 60);
 
         return back()->with('error', 'Invalid email or password.');
     }

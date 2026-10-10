@@ -9,6 +9,8 @@
     <p class="muted">{{ number_format($counts['student'] ?? 0) }} students &middot; {{ $counts['examiner'] ?? 0 }} examiners &middot; {{ $counts['admin'] ?? 0 }} admins</p></div>
 
 @if($errors->any())<div class="alert err">{{ $errors->first() }}</div>@endif
+@if($errors->reset->any())<div class="alert err">{{ $errors->reset->first() }}</div>@endif
+
 
 <details class="card" {{ $errors->any() ? 'open' : '' }}>
     <summary class="h3" style="cursor:pointer">Add an examiner or admin</summary>
@@ -73,7 +75,12 @@
                     <td class="small muted">{{ $u->created_at?->format('j M Y') }}</td>
                     <td><div class="actions">@if($u->id !== $me)
                         <form method="POST" action="{{ route('console.users.toggle', $u) }}">@csrf @method('PATCH')
-                            <button class="btn {{ $u->is_active ? 'btn-d' : 'btn-o' }} btn-sm" type="submit" @if($u->is_active) data-confirm="Suspend {{ $u->name }}? They will be signed out and unable to sign in." @endif>{{ $u->is_active ? 'Suspend' : 'Reactivate' }}</button></form>@endif</div></td>
+                            @if($u->is_active)
+                                <button class="btn btn-d btn-sm" type="submit" data-confirm="{{ $u->name }} will be signed out everywhere and will not be able to sign in until you reactivate the account." data-confirm-title="Suspend {{ $u->name }}?" data-confirm-label="Suspend" data-confirm-tone="danger">Suspend</button>
+                            @else
+                                <button class="btn btn-o btn-sm" type="submit" data-confirm="{{ $u->name }} will be able to sign in and use TestaCBT again." data-confirm-title="Reactivate {{ $u->name }}?" data-confirm-label="Reactivate">Reactivate</button>
+                            @endif</form>@endif
+                        <button class="btn btn-o btn-sm" type="button" data-reset-open data-name="{{ $u->name }}" data-action="{{ route('console.users.password', $u) }}">Reset password</button></div></td>
                 </tr>
             @empty
                 <tr><td colspan="7"><div class="empty">
@@ -112,3 +119,47 @@
     @endif
 </section>
 @endsection
+
+{{-- One reset-password modal for the whole page. The button on each row fills in the person and where to send it. --}}
+<dialog class="confirm-modal" id="reset-dialog" aria-labelledby="reset-title">
+    <form method="POST" id="reset-form" class="stack" style="gap:14px">
+        @csrf
+        <h2 class="h2" id="reset-title">Reset password</h2>
+        <p class="confirm-text" style="margin:0" id="reset-text"></p>
+        <div class="field">
+            <label for="reset-password">New password</label>
+            <input class="input" id="reset-password" type="text" name="new_password" value="{{ \App\Http\Controllers\Console\UserController::DEFAULT_PASSWORD }}" autocomplete="off">
+            <p class="small muted">The default is {{ \App\Http\Controllers\Console\UserController::DEFAULT_PASSWORD }}. They must choose their own the first time they sign in. If you type a different one, use at least 8 characters with letters and numbers.</p>
+        </div>
+        <div class="confirm-actions">
+            <button type="button" class="btn btn-o" data-reset-cancel>Cancel</button>
+            <button type="submit" class="btn btn-p">Reset password</button>
+        </div>
+    </form>
+</dialog>
+@push('scripts')
+<script>
+(function () {
+  var dialog = document.getElementById('reset-dialog');
+  if (!dialog || typeof dialog.showModal !== 'function') { return; }
+  var form = document.getElementById('reset-form');
+  var input = document.getElementById('reset-password');
+  var opener = null;
+
+  document.addEventListener('click', function (e) {
+    var open = e.target.closest('[data-reset-open]');
+    if (open) {
+      opener = open;
+      form.setAttribute('action', open.getAttribute('data-action'));
+      document.getElementById('reset-title').textContent = 'Reset password for ' + open.getAttribute('data-name') + '?';
+      document.getElementById('reset-text').textContent = open.getAttribute('data-name') + ' will be signed out on every phone and browser.';
+      input.value = '{{ \App\Http\Controllers\Console\UserController::DEFAULT_PASSWORD }}';
+      dialog.showModal();
+      return;
+    }
+    if (e.target.closest('[data-reset-cancel]') || e.target === dialog) { dialog.close(); }
+  });
+  dialog.addEventListener('close', function () { if (opener) { try { opener.focus(); } catch (err) {} } });
+})();
+</script>
+@endpush

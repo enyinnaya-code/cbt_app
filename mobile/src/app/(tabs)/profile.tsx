@@ -121,6 +121,7 @@ export default function Profile() {
 
       <Badge label={`TestaCBT ${require('../../../app.json').expo.version}`} kind="neutral" />
       <Button label="Sign out" variant="danger" icon="logout" onPress={signOut} />
+      <T variant="tiny" muted style={{ textAlign: 'center' }}>A product of Node Netcad Enterprise</T>
     </Screen>
   );
 }

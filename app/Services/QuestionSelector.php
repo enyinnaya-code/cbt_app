@@ -62,6 +62,12 @@ class QuestionSelector
         return $this->payload($ordered, $withKey);
     }
 
+    /** A practice set made from a list of question ids (wrong answers, recent questions...), limited to what the student may open. */
+    public function fromIds(array $ids, int $count, ?int $seed = null, ?Access $access = null): array
+    {
+        return $this->pick($this->candidates(fn ($paper) => $paper, null, array_values($ids), $access), $count, keepOrder: false, seed: $seed);
+    }
+
     public function saved(User $user, int $count, ?int $seed = null, ?Access $access = null): array
     {
         $ids = DB::table('bookmarks')->where('user_id', $user->id)->where('is_bookmarked', true)->pluck('question_id');

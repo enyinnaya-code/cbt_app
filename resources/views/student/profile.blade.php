@@ -77,10 +77,11 @@
 
 <section class="card stack" style="gap:16px">
     <h2 class="h2">{{ $user->password ? 'Change password' : 'Set a password' }}</h2>
+    @if($user->must_change_password)<div class="alert err" role="alert">An admin reset your password. Please choose a new one now. You can use the rest of TestaCBT once you have.</div>@endif
     @if(! $user->password)<p class="small muted">You signed in with Google. Set a password if you also want to sign in with your email.</p>@endif
     <form method="POST" action="{{ route('profile.password') }}" class="stack" style="gap:14px">
         @csrf @method('PUT')
-        @if($user->password)
+        @if($user->password && ! $user->must_change_password)
         <div class="field">
             <label for="current_password">Current password</label>
             <input id="current_password" type="password" class="input @if($errors->password->has('current_password')) err @endif" name="current_password" autocomplete="current-password" required>

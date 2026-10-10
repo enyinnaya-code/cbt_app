@@ -49,4 +49,43 @@ return [
 
     // A subject at or above this accuracy counts as "strong"; below it, "needs work".
     'strong_accuracy' => 70,
+
+    // Engagement. XP is worked out from question_attempts, so the same answers earn the same XP on web and phone.
+    'xp' => [
+        'correct' => 10,
+        'wrong' => 2,                 // trying still counts
+        'daily_answer_cap' => 400,    // XP from answers per day, so repeating one question cannot farm levels
+        'challenge_bonus' => 100,
+    ],
+    'challenge_size' => 10,
+    'challenge_min' => 5,             // a subject with fewer usable questions than this is skipped
+
+    // Level starts at 1 with the first title; each row is the XP needed to reach it.
+    'levels' => [
+        ['xp' => 0, 'title' => 'Beginner'],
+        ['xp' => 100, 'title' => 'Learner'],
+        ['xp' => 400, 'title' => 'Rising Scholar'],
+        ['xp' => 1000, 'title' => 'Scholar'],
+        ['xp' => 2000, 'title' => 'Advanced Scholar'],
+        ['xp' => 4000, 'title' => 'Expert'],
+        ['xp' => 8000, 'title' => 'Master'],
+    ],
+
+    // The retired school screens. Off: they answer 404. Turn on only to look at old data, then turn off again.
+    'legacy_school' => (bool) env('LEGACY_SCHOOL', false),
+
+    // Rebuild a subject's downloadable pack by itself whenever its published papers change. Tests turn this off.
+    'auto_packs' => (bool) env('TESTACBT_AUTO_PACKS', true),
+
+    // Rankings. A student who joins is shown by nickname, picture and (if they choose) school, never by their real name.
+    // Change privacy_version whenever the policy changes in a way that needs fresh consent: everyone is asked again.
+    'privacy_version' => '2026-10',
+    'avatars' => [
+        'owl' => "\u{1F989}", 'fox' => "\u{1F98A}", 'lion' => "\u{1F981}", 'eagle' => "\u{1F985}", 'tiger' => "\u{1F42F}", 'panda' => "\u{1F43C}",
+        'rocket' => "\u{1F680}", 'star' => "\u{2B50}", 'bolt' => "\u{26A1}", 'book' => "\u{1F4DA}", 'brain' => "\u{1F9E0}", 'trophy' => "\u{1F3C6}",
+    ],
+    // Words a nickname may not contain: staff and brand names (so nobody can pretend to be us) and rude words.
+    'reserved_nicknames' => ['admin', 'moderator', 'support', 'staff', 'official', 'testacbt', 'helpdesk', 'fuck', 'shit', 'bitch', 'pussy', 'dick', 'nigg', 'rape', 'porn'],
+    'leaderboard_size' => 50,
+    'school_board_min_members' => 3,   // a school appears only once this many students from it have played, so no one is singled out
 ];

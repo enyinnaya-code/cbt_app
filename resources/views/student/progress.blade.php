@@ -51,6 +51,59 @@
         @endforeach
     </section>
 
+
+    @if(count($bests))
+    <section class="card">
+        <h2 class="h2" style="margin-bottom:8px">Personal bests</h2>
+        <div class="grid3">
+            @foreach($bests as $b)
+                <div class="stat"><span class="tiny muted">{{ $b['label'] }}</span><span class="h3">{{ $b['value'] }}</span></div>
+            @endforeach
+        </div>
+    </section>
+    @endif
+
+    @if(collect($weekly)->whereNotNull('accuracy')->count() > 1)
+    <section class="card stack" style="gap:12px">
+        <div><p class="small muted">Accuracy by week</p></div>
+        <div class="chart" role="img" aria-label="Accuracy for each of the last 8 weeks">
+            @foreach($weekly as $w)
+                <div><span class="b {{ $loop->last ? 'on' : '' }}" style="height:{{ max(3, $w['accuracy'] ?? 0) }}%" title="{{ $w['accuracy'] === null ? 'No answers' : $w['accuracy'] . '% of ' . $w['answered'] }}"></span>{{ $w['label'] }}</div>
+            @endforeach
+        </div>
+    </section>
+    @endif
+
+    @if($improvement->isNotEmpty())
+    <section class="card">
+        <h2 class="h2" style="margin-bottom:4px">Improvement</h2>
+        <p class="small muted">Last 30 days compared with the 30 days before.</p>
+        @foreach($improvement as $i)
+            <div class="li">
+                <div class="grow"><p class="h3">{{ $i->name }}</p><p class="small muted">{{ $i->before }}% &rarr; {{ $i->now }}%</p></div>
+                <span class="badge {{ $i->change >= 0 ? 'g' : 'r' }}">{{ $i->change > 0 ? '+' : '' }}{{ $i->change }}%</span>
+            </div>
+        @endforeach
+    </section>
+    @endif
+
+    @if($mastery->isNotEmpty())
+    <section class="card">
+        <h2 class="h2" style="margin-bottom:4px">Topic mastery</h2>
+        @foreach($mastery as $m)
+            <p class="h3" style="margin:14px 0 2px">{{ $m->subject }}</p>
+            @foreach($m->topics as $t)
+                <div class="li">
+                    <div class="grow col" style="gap:6px">
+                        <div class="row between"><span>{{ $t->topic }}</span><span class="small muted">{{ $t->accuracy }}% &middot; {{ $t->answered }} {{ Str::plural('answer', $t->answered) }}</span></div>
+                        <div class="bar {{ $t->accuracy < $strong ? 'amber' : '' }}"><i style="width:{{ $t->accuracy }}%"></i></div>
+                    </div>
+                </div>
+            @endforeach
+        @endforeach
+    </section>
+    @endif
+
     @if($weakTopics->isNotEmpty())
     <section class="card">
         <h2 class="h2" style="margin-bottom:4px">Topics to work on</h2>

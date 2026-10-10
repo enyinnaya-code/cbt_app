@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Services\DailyChallenge;
 use App\Services\ProgressRecorder;
+use App\Services\QuestionSelector;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -33,6 +35,11 @@ class SyncController extends Controller
             'bookmarks.*.bookmarked' => ['required', 'boolean'],
             'bookmarks.*.changed_at' => ['required', 'date'],
 
+            'challenges' => ['sometimes', 'array', 'max:5'],
+            'challenges.*.date' => ['required', 'date_format:Y-m-d'],
+            'challenges.*.question_ids' => ['required', 'array', 'min:1', 'max:50'],
+            'challenges.*.question_ids.*' => ['integer'],
+
             'mock_sessions' => ['sometimes', 'array', 'max:50'],
             'mock_sessions.*.client_uuid' => ['required', 'uuid'],
             'mock_sessions.*.exam_id' => ['required', 'integer', 'exists:exams,id'],
@@ -49,16 +56,21 @@ class SyncController extends Controller
         $recorder = new ProgressRecorder($request->user());
         $now = now();
 
-        $result = DB::transaction(function () use ($recorder, $data, $now) {
+        $result = DB::transaction(function () use ($recorder, $data, $now, $request) {
             return [
                 'attempts' => $recorder->attempts($data['attempts'] ?? [], $now),
                 'bookmarks' => $recorder->bookmarks($data['bookmarks'] ?? [], $now),
                 'mock_sessions' => $recorder->mockSessions($data['mock_sessions'] ?? [], $now),
+                // After the attempts above, so the challenge can be checked against the answers just stored.
+                'challenges' => collect($data['challenges'] ?? [])
+                    ->map(fn ($c) => (new DailyChallenge($request->user(), app(QuestionSelector::class)))->claim($c['date'], $c['question_ids']))
+                    ->filter()->values()->all(),
             ];
         });
 
         return response()->json([
             'accepted' => ['attempts' => $result['attempts']['accepted'], 'bookmarks' => $result['bookmarks']['accepted'], 'mock_sessions' => $result['mock_sessions']],
+            'challenges' => $result['challenges'],
             'rejected' => ['attempts' => $result['attempts']['rejected'], 'bookmarks' => $result['bookmarks']['rejected']],
             'server_time' => $now->toIso8601String(),
         ]);
@@ -115,12 +127,19 @@ class SyncController extends Controller
                 'taken_at' => $this->iso($m->taken_at),
             ]));
 
+        // Completed daily challenges (one a day at most), so the phone's XP includes the bonus from either device.
+        $challenges = DB::table('daily_challenges')->where('user_id', $user->id)->whereNotNull('completed_at')
+            ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
+            ->orderBy('challenge_date')->get(['challenge_date', 'correct', 'total', 'xp_awarded'])
+            ->map(fn ($c) => ['date' => Carbon::parse($c->challenge_date)->toDateString(), 'correct' => (int) $c->correct, 'total' => (int) $c->total, 'xp' => (int) $c->xp_awarded]);
+
         return response()->json([
             'attempts' => $attempts->values(),
             'has_more' => $hasMore,
             'next_cursor' => $attempts->isEmpty() ? $cursor : $attempts->last()->id,
             'bookmarks' => $bookmarks,
             'mock_sessions' => $mocks->values(),
+            'challenges' => $challenges->values(),
             'server_time' => $now->toIso8601String(),
         ]);
     }

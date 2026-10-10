@@ -4,11 +4,12 @@
  * never double count an answer. On a new phone the same code downloads the student's history.
  */
 import {
-  bookmarkedIds, markAttemptsSynced, markBookmarksSynced, markMocksSynced, kvGet, kvSet, recordAttempt, saveMock,
-  setBookmark, unsyncedAttempts, unsyncedBookmarks, unsyncedMocks,
+  applyServerChallenge, bookmarkedIds, markAttemptsSynced, markBookmarksSynced, markChallengesSynced, markMocksSynced, kvGet, kvSet,
+  recordAttempt, saveMock, setBookmark, unsyncedAttempts, unsyncedBookmarks, unsyncedChallenges, unsyncedMocks,
 } from '@/db/progress';
 import type { Db } from '@/db/types';
 import { Api, ApiError } from './api';
+import { refreshProfile } from './rankings';
 import type { CatalogIndex } from './catalog';
 
 export interface SyncResult {
@@ -27,6 +28,7 @@ interface PullResponse {
   has_more: boolean;
   next_cursor: number;
   bookmarks: { question_id: number; bookmarked: boolean; changed_at: string; exam_id: number | null; subject_id: number | null }[];
+  challenges?: { date: string; correct: number; total: number; xp: number }[];
   mock_sessions: { client_uuid: string; exam_id: number; subject_scores: { subject_id: number; correct: number; total: number }[]; score: number; total: number; duration_seconds: number; taken_at: string }[];
   server_time: string;
 }
@@ -50,7 +52,8 @@ export class SyncEngine {
     const r = await this.db.getFirstAsync<{ n: number }>(
       `SELECT (SELECT COUNT(*) FROM attempts WHERE synced = 0 AND question_id > 0)
             + (SELECT COUNT(*) FROM bookmarks WHERE synced = 0 AND question_id > 0)
-            + (SELECT COUNT(*) FROM mocks WHERE synced = 0) AS n`,
+            + (SELECT COUNT(*) FROM mocks WHERE synced = 0)
+            + (SELECT COUNT(*) FROM challenges WHERE completed = 1 AND synced = 0 AND question_ids != '[]') AS n`,
     );
     return r?.n ?? 0;
   }
@@ -58,6 +61,9 @@ export class SyncEngine {
   private async go(): Promise<SyncResult> {
     const pushed = await this.push();
     const pulled = await this.pull();
+    // These ride along but never fail the sync: progress is already safe.
+    await this.syncSettings().catch(() => undefined);
+    await refreshProfile(this.db, this.api).catch(() => undefined);
     return { pushed, pulled };
   }
 
@@ -68,11 +74,13 @@ export class SyncEngine {
       const attempts = await unsyncedAttempts(this.db, 200);
       const marks = await unsyncedBookmarks(this.db, 200);
       const mocks = await unsyncedMocks(this.db, 20);
-      if (!attempts.length && !marks.length && !mocks.length) break;
+      const challenges = await unsyncedChallenges(this.db);
+      if (!attempts.length && !marks.length && !mocks.length && !challenges.length) break;
 
       const body = {
         attempts: attempts.map((a) => ({ client_uuid: a.uuid, question_id: a.question_id, mode: a.mode, selected: a.selected, time_ms: a.time_ms, answered_at: a.answered_at })),
         bookmarks: marks.map((b) => ({ question_id: b.question_id, bookmarked: b.is_bookmarked === 1, changed_at: b.changed_at })),
+        challenges: challenges.map((c) => ({ date: c.day, question_ids: JSON.parse(c.question_ids) })),
         mock_sessions: mocks.map((m) => ({
           client_uuid: m.uuid, exam_id: m.exam_id, score: m.score, total: m.total, duration_seconds: m.duration_seconds,
           taken_at: m.taken_at, subject_scores: JSON.parse(m.subject_scores),
@@ -89,12 +97,42 @@ export class SyncEngine {
       await markAttemptsSynced(this.db, attempts.map((a) => a.uuid));
       await markBookmarksSynced(this.db, marks.map((b) => b.question_id));
       await markMocksSynced(this.db, mocks.map((m) => m.uuid));
+      await markChallengesSynced(this.db, challenges.map((c) => c.day));
       total.attempts += attempts.length;
       total.bookmarks += marks.length;
       total.mocks += mocks.length;
     }
 
     return total;
+  }
+
+  /**
+   * Language, target exam and exam date are the same on the website and the phone. A change made here is sent first;
+   * otherwise whatever the server has is taken, so a change made on the website shows up on the phone.
+   */
+  private async syncSettings(): Promise<void> {
+    const raw = await kvGet(this.db, 'settings');
+    let local: Record<string, unknown> = {};
+    try { local = raw ? (JSON.parse(raw) as Record<string, unknown>) : {}; } catch { local = {}; }
+
+    if ((await kvGet(this.db, 'settings.dirty')) === '1') {
+      try {
+        await this.api.put('/me/settings', { lang: local.lang ?? 'en', target_exam: local.targetExam ?? null, target_exam_date: local.targetExamDate ?? null });
+      } catch (e) {
+        // A value the server will never accept would block this forever; drop the flag. Anything else (offline) retries later.
+        if (!(e instanceof ApiError) || e.kind !== 'validation') throw e;
+      }
+      await kvSet(this.db, 'settings.dirty', '0');
+      return;
+    }
+
+    const { data } = await this.api.get<{ lang: 'en' | 'pcm'; target_exam: string | null; target_exam_date: string | null }>('/me/settings');
+    // Only take what is well formed; a surprising reply must never wipe the phone's own choices.
+    const next: Record<string, unknown> = { ...local };
+    if (data?.lang === 'en' || data?.lang === 'pcm') next.lang = data.lang;
+    if (typeof data?.target_exam === 'string' || data?.target_exam === null) next.targetExam = data.target_exam;
+    if (typeof data?.target_exam_date === 'string' || data?.target_exam_date === null) next.targetExamDate = data.target_exam_date;
+    await kvSet(this.db, 'settings', JSON.stringify(next));
   }
 
   private async pull(): Promise<SyncResult['pulled']> {
@@ -138,6 +176,8 @@ export class SyncEngine {
           });
           total.mocks++;
         }
+
+        for (const c of data.challenges ?? []) await applyServerChallenge(this.db, { day: c.date, correct: c.correct, total: c.total, xp: c.xp });
       });
 
       cursor = data.next_cursor;

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Student;
 
 use App\Http\Controllers\Controller;
+use App\Services\Engagement;
 use App\Services\StudentStats;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -40,6 +41,10 @@ class ProgressController extends Controller
             'weakest' => $subjects->first(),
             'weakTopics' => $stats->weakTopics(),
             'mocks' => $mocks,
+            'mastery' => $stats->topicMastery(),
+            'improvement' => $stats->improvement(),
+            'weekly' => $stats->weeklyAccuracy(),
+            'bests' => $stats->bests(new Engagement($user)),
         ]);
     }
 }

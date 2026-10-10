@@ -12,6 +12,13 @@ class RoleAccessTest extends TestCase
 
     private int $seq = 0;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // These check who may open the retired school screens, so those screens are switched on here.
+        config(['testacbt.legacy_school' => true]);
+    }
+
     private function userOfType(int $type): User
     {
         return User::create([

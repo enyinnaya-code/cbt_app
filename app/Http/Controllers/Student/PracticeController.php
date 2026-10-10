@@ -10,6 +10,7 @@ use App\Models\Subject;
 use App\Services\Access;
 use App\Services\Pricing;
 use App\Services\ProgressRecorder;
+use App\Services\Revision;
 use App\Services\QuestionSelector;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -73,8 +74,9 @@ class PracticeController extends Controller
     {
         $data = $request->validate([
             'saved' => ['nullable', 'boolean'],
-            'exam' => ['required_without_all:saved,topic', 'nullable', Rule::exists('exams', 'slug')],
-            'subject' => ['required_without:saved', 'nullable', Rule::exists('subjects', 'slug')],
+            'revision' => ['nullable', 'in:wrong,missed,recent'],
+            'exam' => ['required_without_all:saved,topic,revision', 'nullable', Rule::exists('exams', 'slug')],
+            'subject' => ['required_without_all:saved,revision', 'nullable', Rule::exists('subjects', 'slug')],
             'year' => ['nullable', 'integer', 'between:1970,2100'],
             'topic' => ['nullable', 'integer'],
             'mode' => ['required', 'in:instant,end'],
@@ -84,7 +86,14 @@ class PracticeController extends Controller
         $user = $request->user();
         $count = (int) $data['count'];
 
-        if (! empty($data['saved'])) {
+        if (! empty($data['revision'])) {
+            $source = $data['revision'];
+            $ids = (new Revision($user, $selector))->ids($source);
+            $picked = $selector->fromIds($ids, $count, null, Access::for($user));
+            $title = Revision::SOURCES[$source]['title'];
+            $subtitle = null;
+            $again = route('revision');
+        } elseif (! empty($data['saved'])) {
             $picked = $selector->saved($user, $count, null, Access::for($user));
             $title = 'Saved questions';
             $subtitle = null;
@@ -117,10 +126,24 @@ class PracticeController extends Controller
         }
         unset($q);
 
+        // A locked subject is practised from its free sample; the results screen offers the rest.
+        $unlock = null;
+        if (empty($data['saved']) && empty($data['revision']) && isset($exam, $subject)) {
+            $access = Access::for($user);
+            if (! $access->full($exam->id, $subject->id)) {
+                $unlock = [
+                    'url' => route('checkout.show', ['exam' => $exam->slug, 'subjects' => [$subject->slug]]),
+                    'price' => $access->price($exam->id, $subject->id),
+                    'subject' => $title,
+                ];
+            }
+        }
+
         return view('student.practice-session', [
             'title' => $title,
             'session' => [
                 'kind' => 'practice',
+                'unlock' => $unlock,
                 'title' => $title,
                 'subtitle' => $subtitle,
                 'mode' => $data['mode'],

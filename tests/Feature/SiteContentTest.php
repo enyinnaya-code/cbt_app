@@ -75,6 +75,8 @@ class SiteContentTest extends TestCase
 
     public function test_with_no_app_available_the_landing_page_has_no_app_section_and_no_coming_soon(): void
     {
+        $this->tempPublic();   // the real release build in public/downloads must not leak into this test
+        $this->tempPublic();   // the real release build in public/downloads must not leak into this test
         $this->get('/')->assertOk()
             ->assertDontSee('Coming soon')
             ->assertDontSee('Take TestaCBT with you')->assertDontSee('Use it on your phone')->assertDontSee('id="download"', false)
@@ -92,6 +94,7 @@ class SiteContentTest extends TestCase
 
     public function test_a_link_to_an_apk_hosted_elsewhere_becomes_a_download_button(): void
     {
+        $this->tempPublic();
         Setting::put(['app.apk_url' => 'https://files.example.com/testacbt.apk', 'app.apk_version' => '1.2.0']);
 
         $this->get('/')->assertOk()
@@ -235,6 +238,7 @@ class SiteContentTest extends TestCase
 
     public function test_download_link_falls_back_to_the_apk_and_then_to_the_landing_page(): void
     {
+        $this->tempPublic();
         $this->withHeader('User-Agent', 'Android')->get('/download')->assertRedirect(route('welcome') . '#download');
 
         Setting::put(['app.apk_url' => 'https://testacbt.com/testacbt.apk']);

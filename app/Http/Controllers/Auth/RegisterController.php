@@ -26,7 +26,7 @@ class RegisterController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'email' => ['required', 'email:rfc', 'max:190', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'password' => ['required', 'string', \Illuminate\Validation\Rules\Password::min(8)->letters()->numbers(), 'max:200', 'confirmed'],
             'preferred_exams' => ['nullable', 'array'],
             'preferred_exams.*' => ['string', Rule::exists('exams', 'slug')],
         ]);

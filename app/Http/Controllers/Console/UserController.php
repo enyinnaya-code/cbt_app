@@ -79,7 +79,7 @@ class UserController extends Controller
             'name' => ['required', 'string', 'max:120'],
             'email' => ['required', 'email:rfc', 'max:190', 'unique:users,email'],
             'role' => ['required', Rule::in([User::ROLE_EXAMINER, User::ROLE_ADMIN])],
-            'password' => ['required', 'string', 'min:8', 'max:200'],
+            'password' => ['required', 'string', \Illuminate\Validation\Rules\Password::min(8)->letters()->numbers(), 'max:200'],
         ]);
 
         User::create([
@@ -124,6 +124,42 @@ class UserController extends Controller
         if ($suspending) { $user->tokens()->delete(); }
 
         return back()->with('success', $suspending ? "{$user->name} is suspended." : "{$user->name} can sign in again.");
+    }
+
+    /** The password an admin reset gives. It is shared, so it only ever works to choose a new one. */
+    public const DEFAULT_PASSWORD = '123456';
+
+    /**
+     * An admin resets anyone's password: a student, an examiner or another admin. By default the password becomes 123456 and
+     * the person must choose their own the first time they sign in (that password opens nothing else). An admin may type a
+     * different one instead. Every phone and browser the person was signed in on is signed out, so whoever had the old
+     * password (or a stolen token) loses access straight away.
+     */
+    public function password(Request $request, User $user)
+    {
+        $data = $request->validateWithBag('reset', [
+            'new_password' => ['nullable', 'string', 'max:200'],
+        ]);
+
+        $password = trim((string) ($data['new_password'] ?? '')) ?: self::DEFAULT_PASSWORD;
+
+        // Anything but the default has to be a real password; the default is allowed only because of the forced change.
+        if ($password !== self::DEFAULT_PASSWORD) {
+            $request->validateWithBag('reset', ['new_password' => [\Illuminate\Validation\Rules\Password::min(8)->letters()->numbers()]]);
+        }
+
+        $user->forceFill(['password' => $password, 'must_change_password' => true, 'remember_token' => \Illuminate\Support\Str::random(60)])->save();
+        $user->tokens()->delete();
+        if (config('session.driver') === 'database') {
+            \Illuminate\Support\Facades\DB::table(config('session.table', 'sessions'))->where('user_id', $user->id)->delete();
+        }
+
+        // Who did what, never the password itself.
+        \Illuminate\Support\Facades\Log::info('Password reset by an admin', ['admin_id' => $request->user()->id, 'user_id' => $user->id]);
+
+        $shown = $password === self::DEFAULT_PASSWORD ? ' to ' . self::DEFAULT_PASSWORD : '';
+
+        return back()->with('success', "Password for {$user->name} reset{$shown}. They have been signed out everywhere and must choose a new one when they sign in.");
     }
 
     /** Stops an admin locking themselves, or everyone, out. */

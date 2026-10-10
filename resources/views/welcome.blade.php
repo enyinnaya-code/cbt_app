@@ -45,7 +45,6 @@
             <div class="hero-row"><span class="q">2</span><span class="bub">A</span><span class="bub">B</span><span class="bub">C</span><span class="bub fill">D</span></div>
         </div>
         </div>
-        <figcaption>Photo: OtuNwachinemere, <a href="https://commons.wikimedia.org/wiki/File:Bida.poly_E-exams_lab_01.jpg" target="_blank" rel="noopener">Wikimedia Commons</a>, <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA 4.0</a></figcaption>
     </figure>
 </section>
 

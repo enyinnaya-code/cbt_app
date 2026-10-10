@@ -122,6 +122,14 @@ export class Api {
     return this.request<T>(path, { ...o, method: 'POST', body });
   }
 
+  put<T>(path: string, body: unknown = {}, o: Omit<RequestOptions, 'method' | 'body'> = {}) {
+    return this.request<T>(path, { ...o, method: 'PUT', body });
+  }
+
+  del<T>(path: string, o: Omit<RequestOptions, 'method' | 'body'> = {}) {
+    return this.request<T>(path, { ...o, method: 'DELETE' });
+  }
+
   get deviceName(): string {
     return this.opts.deviceName?.() ?? 'Phone';
   }

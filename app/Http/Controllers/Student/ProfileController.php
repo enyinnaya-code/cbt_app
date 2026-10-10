@@ -44,18 +44,24 @@ class ProfileController extends Controller
     {
         $user = $request->user();
 
-        $rules = ['password' => ['required', 'string', 'min:8', 'max:200', 'confirmed']];
-        // A Google-only account has no password yet, so it can set one without proving an old one.
-        if ($user->password) {
+        $rules = ['password' => ['required', 'string', \Illuminate\Validation\Rules\Password::min(8)->letters()->numbers(), 'max:200', 'confirmed']];
+        // A Google-only account has no password yet, and a just-reset account has just used the default to sign in:
+        // neither needs to prove an old one. Everyone else does.
+        $mustChange = (bool) $user->must_change_password;
+        if ($user->password && ! $mustChange) {
             $rules['current_password'] = ['required', 'string'];
         }
         $data = $request->validateWithBag('password', $rules);
 
-        if ($user->password && ! Hash::check($data['current_password'], $user->password)) {
+        if ($data['password'] === \App\Http\Controllers\Console\UserController::DEFAULT_PASSWORD) {
+            return back()->withErrors(['password' => 'Please choose a password of your own, not the shared one.'], 'password');
+        }
+
+        if ($user->password && ! $mustChange && ! Hash::check($data['current_password'], $user->password)) {
             return back()->withErrors(['current_password' => 'That is not your current password.'], 'password');
         }
 
-        $user->update(['password' => $data['password']]);
+        $user->forceFill(['password' => $data['password'], 'must_change_password' => false])->save();
         $user->tokens()->delete();   // sign the phone app out everywhere; this browser stays signed in
 
         return back()->with('success', 'Password changed.');

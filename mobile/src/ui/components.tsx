@@ -1,6 +1,6 @@
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import {
-  ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
   type StyleProp, type TextInputProps, type TextStyle, type ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -125,10 +125,118 @@ export function Segmented<V extends string>({ options, value, onChange }: { opti
         return (
           <Pressable key={o.value} accessibilityRole="tab" accessibilityState={{ selected: on }} onPress={() => onChange(o.value)}
             style={[styles.segItem, on && { backgroundColor: c.surface }]}>
-            <Text style={{ fontFamily: fonts.semibold, fontSize: 13, color: on ? c.text : c.muted }} numberOfLines={1}>{o.label}</Text>
+            <Text style={{ fontFamily: fonts.semibold, fontSize: 13, color: on ? c.text : c.muted, textAlign: 'center' }}>{o.label}</Text>
           </Pressable>
         );
       })}
+    </View>
+  );
+}
+
+/**
+ * Tabs that never cut a name short. When they do not all fit they scroll sideways, and an arrow appears on whichever
+ * side has more, so the student knows which way to swipe. Tapping an arrow scrolls that way too.
+ */
+export function ScrollTabs<V extends string>({ options, value, onChange }: { options: { value: V; label: string }[]; value: V; onChange: (v: V) => void }) {
+  const { c } = useTheme();
+  const ref = useRef<ScrollView>(null);
+  const [width, setWidth] = useState(0);
+  const [content, setContent] = useState(0);
+  const [x, setX] = useState(0);
+
+  const canLeft = x > 4;
+  const canRight = content > width && x + width < content - 4;
+  const step = Math.max(120, width * 0.6);
+  const go = (dir: 1 | -1) => ref.current?.scrollTo({ x: Math.max(0, Math.min(content - width, x + dir * step)), animated: true });
+
+  return (
+    <View style={{ backgroundColor: c.surface2, borderRadius: 12, padding: 4 }} accessibilityRole="tablist">
+      <ScrollView
+        ref={ref}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+        onContentSizeChange={(w) => setContent(w)}
+        onScroll={(e) => setX(e.nativeEvent.contentOffset.x)}
+        contentContainerStyle={{ gap: 4 }}
+      >
+        {options.map((o) => {
+          const on = o.value === value;
+          return (
+            <Pressable key={o.value} accessibilityRole="tab" accessibilityState={{ selected: on }} onPress={() => onChange(o.value)}
+              style={{ minHeight: 38, borderRadius: 9, justifyContent: 'center', paddingHorizontal: 14, backgroundColor: on ? c.surface : 'transparent' }}>
+              <Text style={{ fontFamily: fonts.semibold, fontSize: 13, color: on ? c.text : c.muted }}>{o.label}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+      {canLeft ? <ScrollArrow side="left" onPress={() => go(-1)} /> : null}
+      {canRight ? <ScrollArrow side="right" onPress={() => go(1)} /> : null}
+    </View>
+  );
+}
+
+function ScrollArrow({ side, onPress }: { side: 'left' | 'right'; onPress: () => void }) {
+  const { c } = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={side === 'left' ? 'Scroll left' : 'Scroll right'}
+      onPress={onPress}
+      hitSlop={6}
+      style={{ position: 'absolute', top: 4, bottom: 4, [side]: 4, width: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: c.surface, borderWidth: 1, borderColor: c.border }}
+    >
+      <Icon name={side === 'left' ? 'chevL' : 'chevR'} size={16} color={c.text} />
+    </Pressable>
+  );
+}
+
+/** A card that slides up from the bottom with a close button. Tapping outside it, or the system back button, closes it too. */
+export function Sheet({ visible, title, subtitle, onClose, children, footer }: {
+  visible: boolean; title: string; subtitle?: string; onClose: () => void; children: ReactNode; footer?: ReactNode;
+}) {
+  const { c } = useTheme();
+  const insets = useSafeAreaInsets();
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <Pressable accessibilityLabel="Close" accessibilityRole="button" onPress={onClose} style={StyleSheet.absoluteFill}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} />
+        </Pressable>
+        <View style={{ maxHeight: '88%', backgroundColor: c.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderColor: c.border }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontFamily: fonts.display, fontSize: 22, color: c.text }}>{title}</Text>
+              {subtitle ? <Text style={{ fontFamily: fonts.body, fontSize: 13, color: c.muted }}>{subtitle}</Text> : null}
+            </View>
+            <IconButton icon="x" label="Close" onPress={onClose} />
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 20, paddingTop: 8, gap: 18 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            {children}
+          </ScrollView>
+          {footer ? <View style={{ borderTopWidth: 1, borderTopColor: c.border, paddingHorizontal: 20, paddingTop: 12, paddingBottom: Math.max(insets.bottom, 12), gap: 10 }}>{footer}</View> : null}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+/** Earned and not-yet-earned badges, the same on Home and Progress. */
+export function BadgeGrid({ badges }: { badges: { key: string; title: string; text: string; icon: IconName; earned: boolean }[] }) {
+  const { c } = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+      {badges.map((b) => (
+        <View key={b.key} accessible accessibilityLabel={`${b.title}. ${b.text}. ${b.earned ? 'Earned' : 'Not earned yet'}`}
+          style={{ width: '30%', alignItems: 'center', gap: 6, opacity: b.earned ? 1 : 0.45 }}>
+          <View style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: b.earned ? c.accentSoft : c.surface2, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name={b.icon} size={20} color={b.earned ? c.accentInk : c.muted} />
+          </View>
+          <Text style={{ fontFamily: fonts.bold, fontSize: 12, color: c.text, textAlign: 'center' }}>{b.title}</Text>
+        </View>
+      ))}
     </View>
   );
 }

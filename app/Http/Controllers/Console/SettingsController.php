@@ -7,6 +7,7 @@ use App\Models\ContentPack;
 use App\Models\Exam;
 use App\Models\Setting;
 use App\Models\Subject;
+use App\Services\MailSettings;
 use App\Services\PackBuilder;
 use Illuminate\Http\Request;
 
@@ -45,6 +46,8 @@ class SettingsController extends Controller
             'paystack' => \App\Services\Payments\Paystack::configured(),
             'apk' => \App\Http\Controllers\Site\HomeController::apkFiles(),
             'uploadLimit' => self::uploadLimitBytes(),
+            'mail' => app(MailSettings::class)->form(),
+            'mailEncryptions' => MailSettings::ENCRYPTIONS,
         ]);
     }
 
@@ -83,6 +86,53 @@ class SettingsController extends Controller
         }
 
         return back()->with('success', 'Settings saved.');
+    }
+
+    /** The outgoing email account. A blank password keeps the saved one; the password is never shown again. */
+    public function mail(Request $request, MailSettings $mail)
+    {
+        if ($request->boolean('forget_mail')) {
+            $mail->clear();
+
+            return redirect()->to(route('console.settings.edit') . '#email')->with('success', 'The email account was removed. Emails go back to the server\'s own setting.');
+        }
+
+        $data = $request->validate([
+            'mail_host' => ['required', 'string', 'max:190', 'regex:/^[A-Za-z0-9]([A-Za-z0-9.\-]*[A-Za-z0-9])?$/'],
+            'mail_port' => ['required', 'integer', 'between:1,65535'],
+            'mail_encryption' => ['required', 'in:' . implode(',', array_keys(MailSettings::ENCRYPTIONS))],
+            'mail_username' => ['nullable', 'string', 'max:190'],
+            'mail_password' => ['nullable', 'string', 'max:190'],
+            'clear_mail_password' => ['nullable', 'boolean'],
+            'mail_from_address' => ['required', 'email', 'max:190'],
+            'mail_from_name' => ['nullable', 'string', 'max:80'],
+        ], [
+            'mail_host.regex' => 'Type only the server name, for example smtp.gmail.com, without http:// or a port.',
+        ]);
+
+        $mail->save([
+            'host' => $data['mail_host'], 'port' => $data['mail_port'], 'encryption' => $data['mail_encryption'],
+            'username' => $data['mail_username'] ?? null, 'password' => $data['mail_password'] ?? null,
+            'clear_password' => $data['clear_mail_password'] ?? false,
+            'from_address' => $data['mail_from_address'], 'from_name' => $data['mail_from_name'] ?? null,
+        ]);
+
+        return redirect()->to(route('console.settings.edit') . '#email')->with('success', 'Email settings saved. Send a test email to check them.');
+    }
+
+    /** Sends a real email to the admin's own address through the saved account. */
+    public function testMail(Request $request, MailSettings $mail)
+    {
+        if (! $mail->configured()) {
+            return redirect()->to(route('console.settings.edit') . '#email')->with('error', 'Save the email settings first.');
+        }
+
+        $problem = $mail->sendTest($request->user()->email);
+
+        return redirect()->to(route('console.settings.edit') . '#email')->with(
+            $problem ? 'error' : 'success',
+            $problem ?? "A test email was sent to {$request->user()->email}. Check the inbox (and spam).",
+        );
     }
 
     /** Puts a new Android app file in place (or removes the current one) and remembers its size and date. */

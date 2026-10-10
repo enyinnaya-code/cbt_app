@@ -3,9 +3,10 @@ import { View } from 'react-native';
 import { dateTime } from '@/core/format';
 import { lastDays, mocks, streak, subjectStats, totals, weakTopics } from '@/db/progress';
 import { useFocusLoad } from '@/hooks/useFocusLoad';
+import { engagement } from '@/services/engagement';
 import { useData } from '@/state/data';
 import { services } from '@/state/services';
-import { Button, Card, Empty, ProgressBar, Row, Screen, SubjectTile, T } from '@/ui/components';
+import { BadgeGrid, Button, Card, Empty, ProgressBar, Row, Screen, SubjectTile, T } from '@/ui/components';
 import { Icon } from '@/ui/Icon';
 import { useTheme } from '@/ui/theme';
 
@@ -16,13 +17,13 @@ export default function Progress() {
 
   const { data } = useFocusLoad(async () => {
     const { db } = services();
-    const [t, days, week, subjects, topics, recent] = await Promise.all([totals(db), streak(db), lastDays(db, 7), subjectStats(db), weakTopics(db), mocks(db, 5)]);
-    return { t, days, week, subjects, topics, recent };
+    const [t, days, week, subjects, topics, recent, level] = await Promise.all([totals(db), streak(db), lastDays(db, 7), subjectStats(db), weakTopics(db), mocks(db, 5), engagement(db)]);
+    return { t, days, week, subjects, topics, recent, level };
   });
 
   if (!data) return <Screen scroll={false}><View /></Screen>;
 
-  const { t, days, week, subjects, topics, recent } = data;
+  const { t, days, week, subjects, topics, recent, level } = data;
   const max = Math.max(1, ...week.map((d) => d.count));
   const thisWeek = week.reduce((n, d) => n + d.count, 0);
   const accuracy = t.answered ? Math.round((t.correct / t.answered) * 100) : 0;
@@ -62,12 +63,23 @@ export default function Progress() {
           ) : null}
 
           <Card style={{ gap: 14 }}>
+            <Row between>
+              <T variant="h2">Level {level.level.level}: {level.level.title}</T>
+              <T variant="small" muted>{level.level.xp.toLocaleString()} XP</T>
+            </Row>
+            <ProgressBar value={level.level.pct} />
+            <T variant="h2" style={{ marginTop: 6 }}>Badges</T>
+            <BadgeGrid badges={level.badges} />
+            <Button label="See rankings" variant="outline" small full={false} onPress={() => router.push('/rankings' as never)} />
+          </Card>
+
+          <Card style={{ gap: 14 }}>
             <T variant="h2">Score by subject</T>
             {[...subjects].sort((a, b) => b.answered - a.answered).map((s, i) => (
-              <Row key={s.subject_id ?? i}>
+              <Row key={s.subject_id ?? i} style={{ alignItems: 'flex-start' }}>
                 <SubjectTile code={(s.subject_name ?? '??').slice(0, 2)} index={i} />
-                <View style={{ flex: 1, gap: 6 }}>
-                  <Row between><T variant="h3">{s.subject_name}</T><T variant="small" muted>{s.correct} of {s.answered} · {s.accuracy}%</T></Row>
+                <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
+                  <View style={{ gap: 2 }}><T variant="h3">{s.subject_name}</T><T variant="small" muted>{s.correct} of {s.answered} · {s.accuracy}%</T></View>
                   <ProgressBar value={s.accuracy} amber={s.accuracy < strong} />
                 </View>
               </Row>

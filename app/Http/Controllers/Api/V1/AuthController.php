@@ -23,7 +23,7 @@ class AuthController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'email' => ['required', 'email:rfc', 'max:190', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:8', 'max:200'],
+            'password' => ['required', 'string', \Illuminate\Validation\Rules\Password::min(8)->letters()->numbers(), 'max:200'],
             'device_name' => ['required', 'string', 'max:60'],
             'preferred_exams' => ['nullable', 'array'],
             'preferred_exams.*' => ['string', Rule::exists('exams', 'slug')],
@@ -63,6 +63,11 @@ class AuthController extends Controller
 
         if ((int) $user->is_active === 0) {
             return response()->json(['message' => 'Your account is suspended.'], 403);
+        }
+
+        if ($user->must_change_password) {
+            RateLimiter::clear($key);
+            return response()->json(['message' => 'An admin reset your password. Sign in on the TestaCBT website to choose a new one, then use the app again.', 'must_change_password' => true], 403);
         }
 
         RateLimiter::clear($key);

@@ -403,3 +403,20 @@ table.table{width:100%;border-collapse:collapse;font-size:14px}
 .video-dialog .video-close{position:absolute;z-index:2;top:8px;right:8px;width:38px;height:38px;border-radius:50%;border:0;background:rgba(0,0,0,.65);color:#fff;font-size:22px;line-height:1;cursor:pointer}
 .video-dialog .video-close:focus-visible{outline:3px solid var(--accent)}
 .video-dialog.post{--vw:560px;--vh:700px}
+
+/* Confirmation modal (data-confirm). It fades and pops in, unless the student prefers less motion. */
+dialog.confirm-modal{border:1px solid var(--border);border-radius:22px;padding:22px;width:min(92vw,420px);background:var(--surface);color:var(--text);box-shadow:var(--shadow)}
+dialog.confirm-modal::backdrop{background:rgba(0,0,0,.5)}
+dialog.confirm-modal[open]{animation:confirm-pop .18s ease-out}
+dialog.confirm-modal[open]::backdrop{animation:confirm-fade .18s ease-out}
+.confirm-text{margin:8px 0 20px;color:var(--muted);line-height:1.5;overflow-wrap:anywhere}
+.confirm-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+.btn-danger{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn-danger:hover{filter:brightness(.95)}
+@keyframes confirm-pop{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes confirm-fade{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){dialog.confirm-modal[open],dialog.confirm-modal[open]::backdrop{animation:none}}
+
+.credit{margin:18px 0 0;font-size:12px;color:var(--muted);text-align:center}
+.credit a{color:inherit;text-decoration:underline;text-underline-offset:3px}
+.credit a:hover{color:var(--text)}

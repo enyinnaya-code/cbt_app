@@ -80,4 +80,51 @@
 
     <div><button class="btn btn-p" type="submit">Save settings</button></div>
 </form>
+
+<section class="card stack" style="gap:14px" id="email">
+    <div>
+        <h2 class="h2">Email account</h2>
+        <p class="small muted">The account TestaCBT sends email from, such as password reset links. Use the details your email provider gives you (for example Gmail, Zoho, or your host). You can change them here at any time.</p>
+        <p class="small">
+            @if($mail['mail.host'] !== '' && $mail['mail.from_address'] !== '')
+                <span class="badge g">In use</span> Emails go out through <b>{{ $mail['mail.host'] }}</b> as <b>{{ $mail['mail.from_address'] }}</b>.
+            @else
+                <span class="badge">Not set</span> Until you save an account, emails are only written to a file on the server and nobody receives them.
+            @endif
+        </p>
+    </div>
+
+    <form method="POST" action="{{ route('console.settings.mail') }}" class="stack" style="gap:14px" autocomplete="off">
+        @csrf @method('PUT')
+        <div class="grid2">
+            <div class="field"><label for="mail_host">Mail server (host)</label><input id="mail_host" name="mail_host" class="input" required value="{{ old('mail_host', $mail['mail.host']) }}" placeholder="smtp.gmail.com" autocomplete="off"></div>
+            <div class="field"><label for="mail_port">Port</label><input id="mail_port" name="mail_port" type="number" min="1" max="65535" class="input" required value="{{ old('mail_port', $mail['mail.port'] ?: 587) }}"></div>
+        </div>
+        <div class="grid2">
+            <div class="field"><label for="mail_encryption">Security</label>
+                <select id="mail_encryption" name="mail_encryption" class="input">
+                    @foreach($mailEncryptions as $value => $label)<option value="{{ $value }}" @selected(old('mail_encryption', $mail['mail.encryption'] ?: 'tls') === $value)>{{ $label }}</option>@endforeach
+                </select></div>
+            <div class="field"><label for="mail_username">Username</label><input id="mail_username" name="mail_username" class="input" value="{{ old('mail_username', $mail['mail.username']) }}" autocomplete="off" placeholder="Usually your email address"></div>
+        </div>
+        <div class="field">
+            <label for="mail_password">Password</label>
+            <input id="mail_password" name="mail_password" type="password" class="input" autocomplete="new-password" placeholder="{{ $mail['mail.has_password'] ? 'A password is saved. Leave empty to keep it.' : 'The email account password or app password' }}">
+            <p class="small muted">It is kept encrypted and never shown again. For Gmail use an app password, not your normal one.</p>
+            @if($mail['mail.has_password'])<label class="row small" style="gap:8px"><input type="checkbox" name="clear_mail_password" value="1"> Remove the saved password</label>@endif
+        </div>
+        <div class="grid2">
+            <div class="field"><label for="mail_from_address">Send emails from</label><input id="mail_from_address" name="mail_from_address" type="email" class="input" required value="{{ old('mail_from_address', $mail['mail.from_address']) }}" placeholder="no-reply@yourdomain.com"></div>
+            <div class="field"><label for="mail_from_name">Sender name</label><input id="mail_from_name" name="mail_from_name" class="input" value="{{ old('mail_from_name', $mail['mail.from_name']) }}" placeholder="TestaCBT"></div>
+        </div>
+        <div class="row wrap" style="gap:10px"><button class="btn btn-p" type="submit">Save email settings</button></div>
+    </form>
+
+    @if($mail['mail.host'] !== '')
+    <div class="row wrap" style="gap:10px">
+        <form method="POST" action="{{ route('console.settings.mail.test') }}">@csrf <button class="btn btn-o" type="submit">Send a test email to me</button></form>
+        <form method="POST" action="{{ route('console.settings.mail') }}">@csrf @method('PUT') <input type="hidden" name="forget_mail" value="1"><button class="btn btn-d" type="submit" data-confirm="Emails will stop going out through this account until you set one again." data-confirm-title="Remove the email account?" data-confirm-label="Remove" data-confirm-tone="danger">Remove this account</button></form>
+    </div>
+    @endif
+</section>
 @endsection

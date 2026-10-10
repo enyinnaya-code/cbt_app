@@ -23,8 +23,14 @@ export interface Services {
 
 let current: Services | null = null;
 
-/** Where the API lives. Override with EXPO_PUBLIC_API_URL when testing against another server. */
-export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://testacbt.com/api/v1';
+const DEFAULT_API_URL = 'https://testacbt.com/api/v1';
+const fromEnv = process.env.EXPO_PUBLIC_API_URL;
+
+/**
+ * Where the API lives. EXPO_PUBLIC_API_URL can point a development build at a test server, but a release build only ever
+ * talks over https: sign-in details and the account token must never travel in the clear.
+ */
+export const API_URL = fromEnv && (__DEV__ || /^https:\/\//i.test(fromEnv)) ? fromEnv : DEFAULT_API_URL;
 
 export async function initServices(): Promise<Services> {
   if (current) return current;

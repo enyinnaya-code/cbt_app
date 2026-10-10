@@ -32,7 +32,9 @@ return [
 
         'local' => [
             'driver' => 'local',
-            'root' => storage_path('app/private'),
+            // A scratch copy of the site (APP_ENV=clone) must not share this folder with the real one: pack files are named
+            // by exam, subject and version, so two databases would overwrite each other's files.
+            'root' => env('FILESYSTEM_LOCAL_ROOT', storage_path('app/private')),
             'serve' => true,
             'throw' => false,
             'report' => false,

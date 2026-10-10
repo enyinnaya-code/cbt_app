@@ -1,14 +1,18 @@
 import { router } from 'expo-router';
 import { useMemo } from 'react';
 import { View } from 'react-native';
+import { CHALLENGE } from '@/core/challenge';
 import { ago, daysUntil, greeting, initials, plural } from '@/core/format';
 import { bookmarkedIds, lastPractised, streak, subjectStats } from '@/db/progress';
 import { useFocusLoad } from '@/hooks/useFocusLoad';
+import { todaysChallenge } from '@/services/challenge';
+import { isJoined } from '@/services/rankings';
+import { engagement } from '@/services/engagement';
 import { useData } from '@/state/data';
 import { services } from '@/state/services';
 import { useSession } from '@/state/session';
 import { useSettings } from '@/state/settings';
-import { Avatar, Badge, Card, Empty, IconButton, ProgressBar, Row, Screen, SubjectTile, T } from '@/ui/components';
+import { Avatar, Badge, Button, Card, Empty, IconButton, ProgressBar, Row, Screen, SubjectTile, T } from '@/ui/components';
 import { Icon, type IconName } from '@/ui/Icon';
 import { useTheme } from '@/ui/theme';
 
@@ -22,8 +26,13 @@ export default function Home() {
 
   const { data } = useFocusLoad(async () => {
     const { db } = services();
-    const [stats, days, last, saved] = await Promise.all([subjectStats(db), streak(db), lastPractised(db), bookmarkedIds(db)]);
-    return { stats, days, last, saved: saved.size };
+    // The daily challenge feeds the rankings, so it is opt-in: only students who joined get one.
+    const joined = await isJoined(db);
+    const [stats, days, last, saved, level, challenge] = await Promise.all([
+      subjectStats(db), streak(db), lastPractised(db), bookmarkedIds(db), engagement(db),
+      joined ? todaysChallenge(db, services().packs, String(user?.id ?? ''), targetExam) : Promise.resolve(null),
+    ]);
+    return { stats, days, last, saved: saved.size, level, challenge, joined };
   });
 
   const left = daysUntil(targetExamDate);
@@ -72,13 +81,71 @@ export default function Home() {
         )}
       </Card>
 
+      {data?.level ? (
+        <>
+          <T variant="small" muted>{data.level.message}</T>
+          <Card style={{ gap: 12 }}>
+            <Row>
+              <View style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: c.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="trophy" size={20} color={c.accentInk} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <T variant="h3">Level {data.level.level.level}: {data.level.level.title}</T>
+                <T variant="small" muted>{data.level.level.xp.toLocaleString()} XP{data.level.xpToday ? ` · +${data.level.xpToday} today` : ''}</T>
+              </View>
+            </Row>
+            <ProgressBar value={data.level.level.pct} />
+            <T variant="small" muted>
+              {data.level.level.toNext !== null ? `${data.level.level.toNext.toLocaleString()} XP to ${data.level.level.nextTitle}` : 'You have reached the top level.'}
+            </T>
+          </Card>
+        </>
+      ) : null}
+
+      {data && !data.joined ? (
+        <Card style={{ gap: 10 }}>
+          <T variant="h3">Daily challenge</T>
+          <T variant="small" muted>10 questions a day, ranked against other students.</T>
+          <Button full={false} label="Join the daily challenge" onPress={() => router.push('/rankings/join' as never)} />
+        </Card>
+      ) : null}
+
+      {data?.challenge ? (
+        <Card style={{ gap: 12 }}>
+          <Row between>
+            <T variant="h3">{"Today's challenge"}</T>
+            <Badge label={data.challenge.done ? 'Done' : `+${CHALLENGE.bonus} XP`} kind={data.challenge.done ? 'green' : 'neutral'} />
+          </Row>
+          <T variant="small" muted>{data.challenge.subject ? `${data.challenge.subject} · ` : ''}{data.challenge.total} questions</T>
+          {data.challenge.done ? (
+            <>
+              <T variant="small">You scored {data.challenge.correct} of {data.challenge.total}. A new challenge is ready tomorrow.</T>
+              <Button full={false} variant="outline" label="See rankings" onPress={() => router.push('/rankings' as never)} />
+            </>
+          ) : (
+            <>
+              <ProgressBar value={data.challenge.total ? (data.challenge.answered / data.challenge.total) * 100 : 0} />
+              <Row wrap style={{ gap: 8 }}>
+                <Button full={false} label={data.challenge.answered ? `Continue (${data.challenge.answered}/${data.challenge.total})` : 'Start challenge'}
+                  onPress={() => router.push({ pathname: '/practice/session', params: { challenge: '1' } })} />
+                <Button full={false} variant="outline" label="Rankings" onPress={() => router.push('/rankings' as never)} />
+              </Row>
+            </>
+          )}
+        </Card>
+      ) : null}
+
       <Card>
         {data?.last ? (
           <View style={{ gap: 12 }}>
-            <Row between><T variant="h3">Pick up where you stopped</T>{data.last.year ? <Badge label={`${data.last.exam_slug.toUpperCase()} ${data.last.year}`} /> : null}</Row>
-            <Row>
+            <T variant="h3">Pick up where you stopped</T>
+            <Row style={{ alignItems: 'flex-start' }}>
               <SubjectTile code={data.last.subject_name.slice(0, 2)} index={2} />
-              <View style={{ flex: 1 }}><T variant="h3">{data.last.subject_name}</T><T variant="small" muted>Last practised {ago(data.last.answered_at)}</T></View>
+              <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                <T variant="h3">{data.last.subject_name}</T>
+                {data.last.year ? <T variant="small" style={{ fontWeight: '700' }}>{data.last.exam_slug.toUpperCase()} {data.last.year}</T> : null}
+                <T variant="small" muted>Last practised {ago(data.last.answered_at)}</T>
+              </View>
               <IconButton icon="play" label={`Continue ${data.last.subject_name}`} bg={c.primary} color={c.onPrimary} size={44}
                 onPress={() => router.push({ pathname: '/practice', params: { exam: data.last!.exam_slug, subject: data.last!.subject_slug } })} />
             </Row>
@@ -108,10 +175,10 @@ export default function Home() {
           <Empty icon="chart" title="Nothing here yet" body="Your score in each subject will appear once you have answered some questions." />
         ) : (
           stats.slice(0, 4).map((s, i) => (
-            <Row key={s.subject_id ?? i} style={{ paddingVertical: 12, borderBottomWidth: i < Math.min(stats.length, 4) - 1 ? 1 : 0, borderBottomColor: c.border }}>
+            <Row key={s.subject_id ?? i} style={{ alignItems: 'flex-start', paddingVertical: 12, borderBottomWidth: i < Math.min(stats.length, 4) - 1 ? 1 : 0, borderBottomColor: c.border }}>
               <SubjectTile code={(s.subject_name ?? '??').slice(0, 2)} index={i} />
-              <View style={{ flex: 1, gap: 6 }}>
-                <Row between><T variant="h3">{s.subject_name}</T><T variant="small" muted>{s.accuracy}% of {s.answered}</T></Row>
+              <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
+                <View style={{ gap: 2 }}><T variant="h3">{s.subject_name}</T><T variant="small" muted>{s.accuracy}% of {s.answered}</T></View>
                 <ProgressBar value={s.accuracy} amber={s.accuracy < (catalog?.strong_accuracy ?? 70)} />
               </View>
             </Row>

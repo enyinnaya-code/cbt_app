@@ -1,10 +1,11 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Alert, Linking, View } from 'react-native';
 import { ApiError } from '@/services/api';
 import { completeSignIn } from '@/services/afterAuth';
 import { loginWithEmail, loginWithGoogle, validateSignIn } from '@/services/auth';
 import { googleAvailable, googleIdToken } from '@/services/google';
+import { websitePage } from '@/services/webLink';
 import { services } from '@/state/services';
 import { Banner, Button, Card, Divider, Field, IconButton, Row, Screen, T } from '@/ui/components';
 import { Icon } from '@/ui/Icon';
@@ -19,6 +20,17 @@ export default function SignIn() {
   const [busy, setBusy] = useState<'email' | 'google' | null>(null);
 
   const fail = (e: unknown) => setMessage(e instanceof ApiError || e instanceof Error ? e.message : 'Something went wrong. Please try again.');
+
+  // Resetting a password happens on the website: a link goes to the email the account was registered with.
+  const forgot = async () => {
+    const url = websitePage(services().api.baseUrl, '/forgot-password');
+    try {
+      if (!url) throw new Error('no page');
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Could not open the page', 'Please try again in a moment, or go to the TestaCBT website and choose "Forgot my password".');
+    }
+  };
 
   const submit = async () => {
     const found = validateSignIn(email, password);
@@ -73,6 +85,7 @@ export default function SignIn() {
       <Field label="Password" icon="lock" value={password} onChangeText={setPassword} error={errors.password} secure autoCapitalize="none" autoComplete="password" textContentType="password" returnKeyType="go" onSubmitEditing={submit} />
 
       <Button label="Sign in" loading={busy === 'email'} disabled={busy !== null} onPress={submit} />
+      <T variant="small" color={c.primary} style={{ fontWeight: '700', textAlign: 'center' }} accessibilityRole="link" onPress={() => void forgot()}>Forgot my password</T>
 
       <Card kind="flat">
         <Row style={{ alignItems: 'flex-start' }}>

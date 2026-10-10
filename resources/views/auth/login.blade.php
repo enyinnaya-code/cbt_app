@@ -33,6 +33,7 @@
         </div>
         <label class="row small" style="gap:8px"><input type="checkbox" name="remember" value="1"> Keep me signed in on this device</label>
         <button class="btn btn-p block" type="submit">Sign in</button>
+        <p class="small center"><a class="link" href="{{ route('password.request') }}">Forgot my password</a></p>
     </form>
 
     <p class="small muted center">New to TestaCBT? <a class="link" href="{{ route('register') }}">Create account</a></p>

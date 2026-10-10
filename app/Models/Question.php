@@ -37,15 +37,29 @@ class Question extends Model
         parent::boot();
 
         static::deleting(function ($question) {
-            // Match all image src paths from the HTML
-            preg_match_all('/<img[^>]+src="([^">]+)"/', $question->question, $matches);
+            // Pictures this question uploaded go with it. Only files inside public/uploads may ever be removed: the
+            // address comes from HTML an examiner typed, so it can never be trusted to point where it says.
+            preg_match_all('/<img[^>]+src="([^">]+)"/', (string) $question->question, $matches);
+            $root = realpath(public_path('uploads'));
 
             foreach ($matches[1] as $imageUrl) {
-                $imagePath = public_path(parse_url($imageUrl, PHP_URL_PATH));
-                if (File::exists($imagePath)) {
-                    File::delete($imagePath);
+                $path = parse_url($imageUrl, PHP_URL_PATH);
+                $real = $root && is_string($path) ? realpath(public_path($path)) : false;
+
+                if ($real && str_starts_with($real, $root . DIRECTORY_SEPARATOR) && is_file($real)) {
+                    File::delete($real);
                 }
             }
         });
+
+        // A change to a question in a live paper changes what students download: rebuild its pack.
+        $refresh = function ($question) {
+            $paper = $question->paper_id ? Paper::find($question->paper_id) : null;
+            if ($paper && $paper->status === Paper::PUBLISHED) {
+                app(\App\Services\PackRefresher::class)->mark($paper->exam_id, $paper->subject_id);
+            }
+        };
+        static::saved($refresh);
+        static::deleted($refresh);
     }
 }

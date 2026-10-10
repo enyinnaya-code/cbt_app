@@ -32,6 +32,7 @@ interface DataState {
 
   setAwaitingPurchase: (v: boolean) => void;
   syncTiers: () => Promise<void>;
+  autoDownloadSamples: () => Promise<void>;
   loadFromPhone: () => Promise<void>;
   refreshCatalogNow: () => Promise<void>;
   refreshInstalled: () => Promise<void>;
@@ -44,6 +45,9 @@ interface DataState {
 }
 
 const controllers = new Map<string, AbortController>();
+/** A pack at most this big (the free samples) is downloaded without asking. */
+export const SAMPLE_MAX_BYTES = 1_500_000;
+let sampling = false;
 export const packKey = (exam: string, subject: string) => `${exam}/${subject}`;
 
 export const useData = create<DataState>((set, get) => ({
@@ -76,6 +80,7 @@ export const useData = create<DataState>((set, get) => ({
       const { catalog } = await refreshCatalog(db, api);
       set({ catalog, index: new CatalogIndex(catalog) });
       void get().syncTiers();
+      void get().autoDownloadSamples();
     } catch {
       // Offline or a server hiccup: keep using what is on the phone.
     }
@@ -96,6 +101,35 @@ export const useData = create<DataState>((set, get) => ({
         const have = installed.find((i) => i.exam_slug === exam.slug && i.subject_slug === subject.slug);
         if (have && !have.starter && subject.pack && (subject.pack.tier ?? 'full') !== have.tier) void get().download(exam.slug, subject);
       }
+    }
+  },
+
+  /**
+   * Every subject the student has not downloaded yet gets its free sample straight away, so a new student can practise
+   * without finding the Downloads screen. Samples are tiny (a few dozen questions), so this ignores "Wi-Fi only"; the
+   * full packs are big and still wait for the student. The questions bundled with the app are replaced by the real sample.
+   */
+  async autoDownloadSamples() {
+    const { catalog, online } = get();
+    if (!catalog || !online || sampling) return;
+    sampling = true;
+
+    try {
+      const installed = await services().packs.installed();
+      for (const exam of catalog.exams) {
+        for (const subject of exam.subjects) {
+          const pack = subject.pack;
+          const have = installed.find((i) => i.exam_slug === exam.slug && i.subject_slug === subject.slug);
+          if (!pack || (have && !have.starter)) continue;
+          // Only small packs (the free samples) are fetched on their own; a big full pack is the student's call.
+          if (pack.size_bytes > SAMPLE_MAX_BYTES) continue;
+          if (get().downloads[packKey(exam.slug, subject.slug)]) continue;
+
+          await get().download(exam.slug, subject);
+        }
+      }
+    } finally {
+      sampling = false;
     }
   },
 
@@ -156,6 +190,7 @@ export const useData = create<DataState>((set, get) => ({
     set({ syncing: true });
     try {
       await sync.run();
+      await useSettings.getState().hydrate();   // language or exam date changed on the website
       const at = new Date().toISOString();
       await kvSet(db, 'sync.at', at);
       set({ lastSyncedAt: at });

@@ -10,7 +10,7 @@ import { activeMock, finishMock, isExpired, startMock } from '@/services/mockRun
 import { useData } from '@/state/data';
 import { services } from '@/state/services';
 import { useSettings } from '@/state/settings';
-import { Badge, Banner, Button, Card, Empty, Row, Screen, Segmented, SubjectTile, T } from '@/ui/components';
+import { Badge, Banner, Button, Card, Empty, Row, Screen, ScrollTabs, SubjectTile, T } from '@/ui/components';
 import { Icon } from '@/ui/Icon';
 import { unlockOnWebsite } from '@/ui/unlock';
 import { useTheme } from '@/ui/theme';
@@ -121,7 +121,7 @@ export default function Mock() {
         <Empty icon="clock" title="No questions on this phone yet" body="Connect to the internet once to download your subjects." />
       ) : (
         <>
-          <Segmented value={exam?.slug ?? ''} onChange={(v) => { setExamSlug(v); setPicked([]); setError(null); }} options={views.map((v) => ({ value: v.slug, label: v.name }))} />
+          <ScrollTabs value={exam?.slug ?? ''} onChange={(v) => { setExamSlug(v); setPicked([]); setError(null); }} options={views.map((v) => ({ value: v.slug, label: v.name }))} />
 
           {format ? (
             <Card kind="flat">

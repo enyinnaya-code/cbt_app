@@ -77,6 +77,21 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE packs ADD COLUMN tier TEXT NOT NULL DEFAULT 'full';
   UPDATE packs SET tier = 'free' WHERE starter = 1;
   `,
+
+  // 3: one daily challenge per day. The questions are fixed when it is first opened, so reopening shows the same ones.
+  // A row pulled from the server (a challenge done on the website) has no questions, only the day and the bonus.
+  `
+  CREATE TABLE challenges (
+    day TEXT PRIMARY KEY,
+    exam_slug TEXT, subject_slug TEXT, subject_name TEXT,
+    question_ids TEXT NOT NULL,
+    total INTEGER NOT NULL,
+    correct INTEGER,
+    xp INTEGER NOT NULL DEFAULT 0,
+    completed INTEGER NOT NULL DEFAULT 0,
+    synced INTEGER NOT NULL DEFAULT 0
+  );
+  `,
 ];
 
 export async function migrate(db: Db): Promise<void> {

@@ -39,7 +39,7 @@ class PaymentController extends Controller
 
     public function show(Order $order)
     {
-        return view('console.payments.show', ['order' => $order->load(['user:id,name,email,phone', 'exam:id,name', 'items.subject:id,name', 'decider:id,name'])]);
+        return view('console.payments.show', ['order' => $order->load(['user:id,name,email', 'exam:id,name', 'items.subject:id,name', 'decider:id,name'])]);
     }
 
     /** Confirms that the money arrived and opens the subjects. */

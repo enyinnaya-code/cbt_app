@@ -256,6 +256,85 @@ export async function streak(db: Db, today: Date = new Date()): Promise<number> 
   return count;
 }
 
+// ---------------------------------------------------------------------------------------------- daily challenge
+
+export interface ChallengeRow {
+  day: string;
+  exam_slug: string | null;
+  subject_slug: string | null;
+  subject_name: string | null;
+  question_ids: string;
+  total: number;
+  correct: number | null;
+  xp: number;
+  completed: number;
+  synced: number;
+}
+
+export function challengeFor(db: Db, day: string): Promise<ChallengeRow | null> {
+  return db.getFirstAsync<ChallengeRow>('SELECT * FROM challenges WHERE day = ?', [day]);
+}
+
+export async function createChallenge(db: Db, c: { day: string; examSlug: string; subjectSlug: string; subjectName: string; ids: number[] }): Promise<void> {
+  await db.runAsync(
+    'INSERT OR IGNORE INTO challenges (day, exam_slug, subject_slug, subject_name, question_ids, total) VALUES (?,?,?,?,?,?)',
+    [c.day, c.examSlug, c.subjectSlug, c.subjectName, JSON.stringify(c.ids), c.ids.length],
+  );
+}
+
+/** Marks a day's challenge done. Does nothing if it already is, so the bonus is only ever counted once. */
+export async function finishChallenge(db: Db, day: string, correct: number, xp: number): Promise<boolean> {
+  const r = await db.runAsync('UPDATE challenges SET completed = 1, correct = ?, xp = ?, synced = 0 WHERE day = ? AND completed = 0', [correct, xp, day]);
+  return r.changes > 0;
+}
+
+/** A completed challenge from the server. The server's bonus wins, because it pays one challenge a day across all devices. */
+export async function applyServerChallenge(db: Db, c: { day: string; correct: number; total: number; xp: number }): Promise<void> {
+  await db.runAsync(
+    `INSERT INTO challenges (day, question_ids, total, correct, xp, completed, synced) VALUES (?, '[]', ?, ?, ?, 1, 1)
+     ON CONFLICT(day) DO UPDATE SET correct = excluded.correct, total = excluded.total, xp = excluded.xp, completed = 1, synced = 1`,
+    [c.day, c.total, c.correct, c.xp],
+  );
+}
+
+export function unsyncedChallenges(db: Db): Promise<ChallengeRow[]> {
+  return db.getAllAsync<ChallengeRow>("SELECT * FROM challenges WHERE completed = 1 AND synced = 0 AND question_ids != '[]' ORDER BY day LIMIT 5");
+}
+
+export async function markChallengesSynced(db: Db, days: string[]): Promise<void> {
+  for (const d of days) await db.runAsync('UPDATE challenges SET synced = 1 WHERE day = ?', [d]);
+}
+
+export async function completedChallenges(db: Db): Promise<{ correct: number; total: number; xp: number }[]> {
+  const rows = await db.getAllAsync<{ correct: number | null; total: number; xp: number }>('SELECT correct, total, xp FROM challenges WHERE completed = 1');
+  return rows.map((r) => ({ correct: r.correct ?? 0, total: r.total, xp: r.xp }));
+}
+
+/** Distinct questions answered on `day`, counting the first answer to each, and how many were right. */
+export async function challengeProgress(db: Db, day: string, ids: number[]): Promise<{ answered: number; correct: number }> {
+  if (!ids.length) return { answered: 0, correct: 0 };
+  const rows = await db.getAllAsync<{ question_id: number; is_correct: number }>(
+    `SELECT question_id, is_correct FROM attempts WHERE day = ? AND question_id IN (${ids.map(() => '?').join(',')}) ORDER BY answered_at, rowid`,
+    [day, ...ids],
+  );
+  const first = new Map<number, number>();
+  for (const r of rows) if (!first.has(r.question_id)) first.set(r.question_id, r.is_correct);
+  return { answered: first.size, correct: [...first.values()].filter((v) => v === 1).length };
+}
+
+/** Answers and correct answers per local day, for XP, streaks and badges. */
+export async function dayTotals(db: Db): Promise<{ day: string; answered: number; correct: number }[]> {
+  const rows = await db.getAllAsync<{ day: string; answered: number; correct: number | null }>(
+    'SELECT day, COUNT(*) AS answered, SUM(is_correct) AS correct FROM attempts GROUP BY day ORDER BY day',
+  );
+  return rows.map((r) => ({ day: r.day, answered: r.answered, correct: r.correct ?? 0 }));
+}
+
+export async function allMocks(db: Db): Promise<{ examId: number; score: number; total: number; takenAt: string }[]> {
+  const rows = await db.getAllAsync<{ exam_id: number; score: number; total: number; taken_at: string }>('SELECT exam_id, score, total, taken_at FROM mocks');
+  return rows.map((r) => ({ examId: r.exam_id, score: r.score, total: r.total, takenAt: r.taken_at }));
+}
+
 export interface DayCount {
   label: string;
   day: string;

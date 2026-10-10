@@ -24,6 +24,12 @@ Route::prefix('v1')->group(function () {
 
     Route::middleware(['auth:sanctum', 'active', 'throttle:120,1'])->group(function () {
         Route::get('/me', [AuthController::class, 'me']);
+        Route::get('/leaderboard/profile', [\App\Http\Controllers\Api\V1\LeaderboardController::class, 'profile']);
+        Route::put('/leaderboard/profile', [\App\Http\Controllers\Api\V1\LeaderboardController::class, 'join'])->middleware('throttle:20,1');
+        Route::delete('/leaderboard/profile', [\App\Http\Controllers\Api\V1\LeaderboardController::class, 'leave'])->middleware('throttle:20,1');
+        Route::get('/leaderboard', [\App\Http\Controllers\Api\V1\LeaderboardController::class, 'board']);
+        Route::get('/me/settings', [\App\Http\Controllers\Api\V1\SettingsController::class, 'show']);
+        Route::put('/me/settings', [\App\Http\Controllers\Api\V1\SettingsController::class, 'update']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);
 
         Route::get('/catalog', [CatalogController::class, 'index']);

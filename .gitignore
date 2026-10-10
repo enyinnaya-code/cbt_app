@@ -25,3 +25,6 @@ yarn-error.log
 
 # An Android app uploaded in the console. The release build (public/downloads/TestaCBT.apk) is committed on purpose.
 /public/downloads/TestaCBT-upload.apk
+
+# Database dumps taken before risky changes: they hold real student data, never commit them.
+/storage/backups

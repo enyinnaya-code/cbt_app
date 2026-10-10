@@ -2,25 +2,30 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { naira } from '@/core/format';
 import { practiceSession, savedSession } from '@/core/selector';
+import { buildViews } from '@/core/views';
 import type { Pack, SessionData } from '@/core/types';
 import { bookmarkedIds, bookmarks } from '@/db/progress';
+import { challengePlay, completeChallenge } from '@/services/challenge';
 import { recordAnswer, toggleBookmark } from '@/services/recorder';
 import { useData } from '@/state/data';
 import { services } from '@/state/services';
 import { useSettings } from '@/state/settings';
+import { unlockOnWebsite } from '@/ui/unlock';
 import { Badge, Button, Card, Empty, IconButton, ProgressBar, Row, Screen, T } from '@/ui/components';
 import { Icon } from '@/ui/Icon';
 import { AnswerSheet, Explanation, QuestionView, Verdict, type SheetState } from '@/ui/QuestionView';
 import { useTheme } from '@/ui/theme';
 
-type Params = { exam?: string; subject?: string; year?: string; topic?: string; mode?: string; count?: string; saved?: string };
+type Params = { exam?: string; subject?: string; year?: string; topic?: string; mode?: string; count?: string; saved?: string; challenge?: string };
 
 export default function PracticeSession() {
   const p = useLocalSearchParams<Params>();
   const [session, setSession] = useState<SessionData | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
-  const instant = p.mode !== 'end';
+  const challenge = p.challenge === '1';
+  const instant = challenge || p.mode !== 'end';
 
   useEffect(() => {
     let live = true;
@@ -29,7 +34,11 @@ export default function PracticeSession() {
       const count = Math.max(1, Number(p.count ?? 20));
 
       let built: SessionData;
-      if (p.saved === '1') {
+      if (p.challenge === '1') {
+        const play = await challengePlay(db, packs);
+        if (!play) throw new Error('Today\'s challenge is not on this phone. Download a subject and it will appear on Home.');
+        built = play;
+      } else if (p.saved === '1') {
         const marks = await bookmarks(db);
         const ids = new Set(marks.map((m) => m.question_id));
         const need = new Map<string, true>();
@@ -48,7 +57,7 @@ export default function PracticeSession() {
     })().catch((e) => { if (live) setFailed(e instanceof Error ? e.message : 'Could not start practice.'); });
 
     return () => { live = false; };
-  }, [p.exam, p.subject, p.year, p.topic, p.mode, p.count, p.saved]);
+  }, [p.exam, p.subject, p.year, p.topic, p.mode, p.count, p.saved, p.challenge]);
 
   if (failed) {
     return (
@@ -60,19 +69,30 @@ export default function PracticeSession() {
   }
   if (!session) return <Screen scroll={false}><View /></Screen>;
 
-  return <Runner session={session} instant={instant} title={p.saved === '1' ? 'Saved questions' : undefined} exam={p.exam} year={p.year} />;
+  return <Runner session={session} instant={instant} challenge={challenge} title={challenge ? 'Daily challenge' : p.saved === '1' ? 'Saved questions' : undefined} exam={p.exam} year={p.year} />;
 }
 
-function Runner({ session, instant, title, exam, year }: { session: SessionData; instant: boolean; title?: string; exam?: string; year?: string }) {
+function Runner({ session, instant, challenge, title, exam, year }: { session: SessionData; instant: boolean; challenge?: boolean; title?: string; exam?: string; year?: string }) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const lang = useSettings((s) => s.lang);
   const qs = session.questions;
 
+  // Practising a locked subject means practising its free sample. When the student finishes, offer the rest.
+  const catalog = useData((st) => st.catalog);
+  const installedPacks = useData((st) => st.installed);
+  const lockedSubject = useMemo(() => {
+    const first = session.questions[0];
+    if (!first) return null;
+    const subject = buildViews(catalog, installedPacks).find((v) => v.slug === first.examSlug)?.subjects.find((x) => x.slug === first.subjectSlug);
+    return subject?.locked ? { name: subject.name, price: subject.price, exam: first.examSlug, slug: subject.slug, total: subject.fullQuestions } : null;
+  }, [session, catalog, installedPacks]);
+
   const [i, setI] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [finished, setFinished] = useState(false);
   const [review, setReview] = useState(false);
+  const [reward, setReward] = useState<{ done: boolean; newly: boolean; xp: number } | null>(null);
   const [saved, setSaved] = useState<Set<number>>(new Set());
   const shownAt = useRef<Record<number, number>>({});
   const scroller = useRef<ScrollView>(null);
@@ -99,6 +119,7 @@ function Runner({ session, instant, title, exam, year }: { session: SessionData;
     const unanswered = qs.filter((x) => answers[x.id] === undefined).length;
     const done = async () => {
       if (!instant) for (const x of qs) if (answers[x.id] !== undefined) await record(x, answers[x.id]);
+      if (challenge) setReward(await completeChallenge(services().db));
       setFinished(true);
       void useData.getState().syncNow();
     };
@@ -152,6 +173,21 @@ function Runner({ session, instant, title, exam, year }: { session: SessionData;
           </View>
           <Badge label={`${pct}% correct`} kind="green" icon="trophy" />
         </View>
+        {lockedSubject ? (
+          <Card style={{ gap: 8, backgroundColor: c.accentSoft, borderColor: c.accentSoft }}>
+            <T variant="h3">Want more {lockedSubject.name} questions?</T>
+            <T variant="small">
+              That was the free sample. Unlock {lockedSubject.total ? `all ${lockedSubject.total.toLocaleString()} questions` : 'the full subject'}{lockedSubject.price > 0 ? ` for ${naira(lockedSubject.price)}` : ''}.
+            </T>
+            <Button label={lockedSubject.price > 0 ? `Unlock for ${naira(lockedSubject.price)}` : 'Unlock'} icon="lock" onPress={() => void unlockOnWebsite({ exam: lockedSubject.exam, subject: lockedSubject.slug })} />
+          </Card>
+        ) : null}
+        {challenge && reward ? (
+          <Card kind="primary" style={{ alignItems: 'center', gap: 4 }}>
+            <T variant="h3" color={c.onPrimary}>{reward.newly ? 'Challenge complete!' : reward.done ? 'Challenge already done today' : 'Answer every question to finish'}</T>
+            {reward.newly ? <T variant="small" color={c.onPrimary}>+{reward.xp} XP</T> : null}
+          </Card>
+        ) : null}
         <Row style={{ gap: 8 }}>
           {[['Correct', right], ['Wrong', answered - right], ['Skipped', qs.length - answered]].map(([label, n]) => (
             <Card key={label as string} style={{ flex: 1, gap: 4 }}><T variant="tiny" muted>{label}</T><T variant="h3">{n}</T></Card>

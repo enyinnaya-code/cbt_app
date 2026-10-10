@@ -51,8 +51,57 @@
     }
 
     var confirmer = e.target.closest('[data-confirm]');
-    if (confirmer && !window.confirm(confirmer.getAttribute('data-confirm'))) { e.preventDefault(); }
+    if (confirmer) {
+      // The second click, made by the modal's Confirm button, goes straight through to do the action.
+      if (confirmer.getAttribute('data-confirmed') === '1') { confirmer.removeAttribute('data-confirmed'); return; }
+      e.preventDefault();
+      askConfirm(confirmer);
+    }
   });
+
+  /* A confirmation modal for any button or link marked data-confirm="Message". Optional: data-confirm-title,
+     data-confirm-label (the button's words) and data-confirm-tone="danger". Escape, Cancel or a tap outside cancels,
+     and focus goes back to where the student was. */
+  var confirmDialog = null;
+
+  function askConfirm(trigger) {
+    if (typeof HTMLDialogElement === 'undefined') {
+      if (window.confirm(trigger.getAttribute('data-confirm'))) { trigger.setAttribute('data-confirmed', '1'); trigger.click(); }
+      return;
+    }
+
+    if (!confirmDialog) {
+      confirmDialog = document.createElement('dialog');
+      confirmDialog.className = 'confirm-modal';
+      confirmDialog.setAttribute('aria-labelledby', 'confirm-title');
+      confirmDialog.innerHTML =
+        '<h2 class="h2" id="confirm-title"></h2><p class="confirm-text"></p>' +
+        '<div class="confirm-actions"><button type="button" class="btn btn-o" data-no>Cancel</button><button type="button" class="btn" data-yes></button></div>';
+      document.body.appendChild(confirmDialog);
+      confirmDialog.addEventListener('click', function (ev) { if (ev.target === confirmDialog) { confirmDialog.close('cancel'); } });   // a tap on the backdrop
+      confirmDialog.querySelector('[data-no]').addEventListener('click', function () { confirmDialog.close('cancel'); });
+    }
+
+    var danger = trigger.getAttribute('data-confirm-tone') === 'danger' || trigger.classList.contains('btn-d');
+    var yes = confirmDialog.querySelector('[data-yes]');
+    confirmDialog.querySelector('#confirm-title').textContent = trigger.getAttribute('data-confirm-title') || 'Are you sure?';
+    confirmDialog.querySelector('.confirm-text').textContent = trigger.getAttribute('data-confirm');
+    yes.textContent = trigger.getAttribute('data-confirm-label') || 'Confirm';
+    yes.className = 'btn ' + (danger ? 'btn-danger' : 'btn-p');
+
+    yes.onclick = function () {
+      confirmDialog.close('confirm');
+      trigger.setAttribute('data-confirmed', '1');
+      trigger.click();
+    };
+    confirmDialog.onclose = function () {
+      if (confirmDialog.returnValue !== 'confirm') { try { trigger.focus(); } catch (err) {} }
+      confirmDialog.returnValue = '';
+    };
+
+    confirmDialog.showModal();
+    confirmDialog.querySelector('[data-no]').focus();   // the safe choice is under the thumb by default
+  }
 
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') { document.querySelectorAll('.usermenu.open').forEach(function (m) { m.classList.remove('open'); }); }

@@ -43,6 +43,7 @@ Route::get('/articles/{slug}', [Site\PostController::class, 'show'])->name('arti
 Route::get('/events', [Site\EventController::class, 'index'])->name('events');
 Route::get('/videos', [Site\VideoController::class, 'index'])->name('videos');
 Route::get('/pricing', [Site\PricingController::class, 'index'])->name('pricing');
+Route::view('/privacy', 'site.privacy')->name('privacy');
 // Paystack sends the student back here; it checks with Paystack itself, so no sign-in is needed to land on it.
 Route::get('/checkout/callback', [Student\CheckoutController::class, 'callback'])->name('checkout.callback');
 Route::get('/download', [Site\HomeController::class, 'download'])->name('download');
@@ -59,16 +60,20 @@ Route::middleware('guest')->group(function () {
     Route::post('/register', [RegisterController::class, 'register'])->middleware('throttle:10,1')->name('register.submit');
 });
 
+// "Forgot my password": a link goes to the registered email. Open to signed-out visitors only.
+Route::middleware('guest')->group(function () {
+    Route::get('/forgot-password', [\App\Http\Controllers\Auth\PasswordResetController::class, 'request'])->name('password.request');
+    Route::post('/forgot-password', [\App\Http\Controllers\Auth\PasswordResetController::class, 'email'])->middleware('throttle:5,1')->name('password.email');
+    Route::get('/password/reset/{token}', [\App\Http\Controllers\Auth\PasswordResetController::class, 'form'])->name('password.reset');
+    Route::post('/password/reset', [\App\Http\Controllers\Auth\PasswordResetController::class, 'update'])->middleware('throttle:10,1')->name('password.update');
+});
+
 // Logout route
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
 
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('/calendar', function () {
-        return view('calendar');
-    })->name('calendar');
-
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // Console for examiners and admins
@@ -123,6 +128,8 @@ Route::middleware(['auth'])->group(function () {
             Route::resource('events', Console\EventController::class)->except('show');
             Route::get('settings', [Console\SettingsController::class, 'edit'])->name('settings.edit');
             Route::put('settings', [Console\SettingsController::class, 'update'])->name('settings.update');
+            Route::put('settings/mail', [Console\SettingsController::class, 'mail'])->name('settings.mail');
+            Route::post('settings/mail/test', [Console\SettingsController::class, 'testMail'])->middleware('throttle:5,1')->name('settings.mail.test');
 
             Route::get('legacy', [Console\LegacyController::class, 'index'])->name('legacy.index');
             Route::post('legacy/{test}', [Console\LegacyController::class, 'store'])->name('legacy.store');
@@ -131,6 +138,7 @@ Route::middleware(['auth'])->group(function () {
             Route::post('users', [Console\UserController::class, 'store'])->name('users.store');
             Route::patch('users/{user}/role', [Console\UserController::class, 'role'])->name('users.role');
             Route::patch('users/{user}/toggle', [Console\UserController::class, 'toggle'])->name('users.toggle');
+            Route::post('users/{user}/password', [Console\UserController::class, 'password'])->middleware('throttle:20,1')->name('users.password');
         });
     });
 
@@ -148,6 +156,13 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/session', [Student\PracticeController::class, 'session'])->name('session');
         Route::post('/attempts', [Student\PracticeController::class, 'attempts'])->middleware('throttle:120,1')->name('attempts');
     });
+    // The daily challenge and its rankings are opt-in: a nickname, a picture, and the privacy policy accepted.
+    Route::get('/rankings', [Student\RankingController::class, 'index'])->name('rankings');
+    Route::get('/rankings/join', [Student\RankingController::class, 'joinForm'])->name('rankings.join');
+    Route::post('/rankings/join', [Student\RankingController::class, 'join'])->middleware('throttle:20,1')->name('rankings.join.store');
+    Route::post('/rankings/leave', [Student\RankingController::class, 'leave'])->middleware('throttle:20,1')->name('rankings.leave');
+    Route::get('/challenge', [Student\ChallengeController::class, 'show'])->name('challenge.show');
+    Route::post('/challenge/complete', [Student\ChallengeController::class, 'complete'])->middleware('throttle:60,1')->name('challenge.complete');
     Route::prefix('mock')->name('mock.')->group(function () {
         Route::get('/', [Student\MockController::class, 'index'])->name('index');
         Route::post('/', [Student\MockController::class, 'start'])->middleware('throttle:20,1')->name('start');
@@ -160,190 +175,200 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/saved', [Student\SavedController::class, 'index'])->name('saved');
     Route::post('/saved/toggle', [Student\SavedController::class, 'toggle'])->middleware('throttle:120,1')->name('saved.toggle');
     Route::get('/progress', Student\ProgressController::class)->name('progress');
+    Route::get('/revision', Student\RevisionController::class)->name('revision');
     Route::get('/profile', [Student\ProfileController::class, 'edit'])->name('profile');
     Route::put('/profile', [Student\ProfileController::class, 'update'])->name('profile.update');
     Route::put('/profile/password', [Student\ProfileController::class, 'password'])->name('profile.password');
-
-    Route::middleware('role:admin')->group(function () {
-        Route::get('/add-section', [SectionController::class, 'create'])->name('section.create');
-        Route::get('/manage-sections', [SectionController::class, 'index'])->name('section.index');
-        Route::get('/add-section', [SectionController::class, 'create'])->name('section.create');
-        Route::post('/add-section', [SectionController::class, 'store'])->name('section.store');
-        Route::get('/add_section', [SectionController::class, 'showSections'])->name('add_section');
-
-        // Update your route definition to accept an ID parameter
-        Route::get('/edit_section/{id}', [SectionController::class, 'edit'])->name('edit_section');
-
-        // Add this update route for form submission
-        Route::put('/section/{id}', [SectionController::class, 'update'])->name('section.update');
-
-        // For deleting a section (this should match exactly what you have)
-        Route::delete('/delete_section/{id}', [SectionController::class, 'destroy'])->name('delete_section');
-
-        Route::get('/add-user', [UserController::class, 'create'])->name('user.add');
-        Route::post('/add-user', [UserController::class, 'store'])->name('user.store');
-
-        Route::get('/add-teacher', [UserController::class, 'create'])->name('teacher.add');
-        Route::post('/add-teacher', [UserController::class, 'store'])->name('teacher.store');
-
-        Route::get('/manage-user', [UserController::class, 'manageUsers'])->name('users.index');
-        Route::get('/edit-user/{id}', [UserController::class, 'edit'])->name('users.edit');
-        Route::patch('users/toggle-active/{id}', [UserController::class, 'toggleActive'])->name('users.toggleActive');
-
-        Route::get('/reset-password/{encryptedId}', [UserController::class, 'resetPassword'])->name('users.reset');
-    
-        Route::delete('/delete-user/{id}', [UserController::class, 'destroy'])->name('users.destroy');
-        Route::put('/edit-user/{id}', [UserController::class, 'update'])->name('users.update');
-
-
-        Route::get('/add-teacher', [UserController::class, 'createTeacher'])->name('teacher.add');
-        Route::post('/add-teacher', [UserController::class, 'storeTeacher'])->name('teacher.store');
-
-        Route::get('/manage-teacher', [UserController::class, 'manageTeacher'])->name('teachers.index');
-        Route::get('/get-classes-by-sections', [UserController::class, 'getClassesBySections'])->name('sections.classes');
-
-        Route::get('/edit-teacher/{id}', [UserController::class, 'editTeacher'])->name('teachers.edit');
-        Route::patch('teachers/toggle-active/{id}', [UserController::class, 'toggleActiveTeacher'])->name('teachers.toggleActive');
-
-        Route::get('/reset-password/{id}', [UserController::class, 'resetPasswordTeacher'])->name('teachers.reset');
-        Route::delete('/delete-teacher/{id}', [UserController::class, 'destroyTeacher'])->name('teachers.destroy');
-        Route::put('/edit-teacher/{id}', [UserController::class, 'updateTeacher'])->name('teachers.update');
-    });
-
-    Route::middleware('role:admin')->group(function () {
-        Route::get('/add-school-class', [SchoolClassController::class, 'create'])->name('schoolClass.add');
-        Route::get('/manage-school-classes', [SchoolClassController::class, 'index'])->name('schoolClass.manage');
-        Route::post('/store-school-class', [SchoolClassController::class, 'store'])->name('schoolClass.store');
-
-        Route::get('/edit-school-class/{id}', [SchoolClassController::class, 'edit'])->name('schoolClass.edit');
-        Route::delete('/delete-school-class/{id}', [SchoolClassController::class, 'destroy'])->name('schoolClass.delete');
-
-        Route::put('/update-school-class/{id}', [SchoolClassController::class, 'update'])->name('schoolClass.update');
-
-        Route::get('/courses/add', [CourseController::class, 'create'])->name('course.create');
-        Route::post('/courses/add', [CourseController::class, 'store'])->name('course.store');
-        Route::get('/courses/manage', [CourseController::class, 'index'])->name('course.manage');
-
-        Route::get('/courses/edit/{id}', [CourseController::class, 'edit'])->name('course.edit');
-
-        // Update after editing
-        Route::put('/courses/update/{id}', [CourseController::class, 'update'])->name('course.update');
-
-        // Delete
-        Route::delete('/courses/delete/{id}', [CourseController::class, 'destroy'])->name('course.delete');
-    });
-
-    Route::middleware('role:admin,examiner')->group(function () {
-        Route::get('/tests/create', [TestController::class, 'create'])->name('tests.create');
-        // Route::post('/tests', [TestController::class, 'store'])->name('tests.store');
-        Route::get('/tests', [TestController::class, 'index'])->name('tests.index');
-        Route::get('/tests/{id}/edit', [TestController::class, 'edit'])->name('tests.edit');
-        Route::put('/tests/{id}', [TestController::class, 'update'])->name('tests.update');
-        Route::delete('/tests/{id}', [TestController::class, 'destroy'])->name('tests.destroy');
-        Route::get('/sections/{id}/classes', [TestController::class, 'getClassesBySection'])->name('sections.classes');
-        Route::post('/tests/store', [TestController::class, 'store'])->name('tests.store');
-        Route::get('/tests/{id}', [TestController::class, 'show'])->name('tests.show');
-    });
-
-    Route::middleware('role:admin')->group(function () {
-        Route::get('/get-subjects-by-section/{sectionId}', [UserController::class, 'getSubjectsBySection']);
-    });
-
-    Route::middleware('role:admin,examiner')->group(function () {
-        Route::get('/questions', [QuestionController::class, 'index'])->name('questions.index');
-        Route::get('/tests/{test}/set-questions', [QuestionController::class, 'setQuestions'])->name('tests.setQuestions');
-        Route::post('/questions/store', [QuestionController::class, 'store'])->name('questions.store');
-        Route::get('/tests/{test}/questions', [QuestionController::class, 'setQuestions'])->name('questions.set');
-        Route::get('/questions/view/{test}', [QuestionController::class, 'viewQuestions'])->name('questions.view');
-        Route::post('/tests/{test}/submit-for-approval', [QuestionController::class, 'submitForApproval'])->name('tests.submitForApproval');
-    });
-
-    Route::get('/view-tests', [TestController::class, 'viewTests'])->name('tests.view');
-    Route::middleware('role:admin')->group(function () {
-        Route::get('/tests/{test}/approve', [TestController::class, 'approveTest'])->name('tests.approve');
-        Route::get('/tests/{test}/check', [TestController::class, 'editCheck'])->name('tests.check');
-        Route::delete('/tests/{test}', [TestController::class, 'deleteTest'])->name('tests.delete');
-        Route::post('/tests/{test}/comment', [TestController::class, 'submitComment'])->name('tests.comment');
-    });
-
-
-
-    Route::middleware('role:admin,examiner')->group(function () {
-        Route::get('/students/create', [StudentController::class, 'create'])->name('students.create');
-        Route::get('/students', [StudentController::class, 'index'])->name('students.index');
-
-        Route::get('/get-classes/{section_id}', [StudentController::class, 'getClasses']);
-
-    
-
-        Route::post('/students', [StudentController::class, 'store'])->name('students.store');
-        Route::get('/students/{student}/edit', [StudentController::class, 'edit'])->name('students.edit');
-        Route::put('/students/{student}', [StudentController::class, 'update'])->name('students.update');
-        Route::delete('/students/{student}', [StudentController::class, 'destroy'])->name('students.destroy');
-
-        Route::patch('/students/{student}/suspend', [StudentController::class, 'suspend'])->name('students.suspend');
-        Route::patch('/students/{student}/activate', [StudentController::class, 'activate'])->name('students.activate');
-        Route::patch('/students/{student}/reset-password', [StudentController::class, 'resetPassword'])->name('students.reset_password');
-    });
-
-    Route::get('/available-tests', [TestController::class, 'available'])->name('tests.available');
-    Route::get('/past-tests', [TestController::class, 'past'])->name('tests.past');
-    Route::get('/past-tests/view/{testId}', [TestController::class, 'viewPast'])->name('tests.viewPast');
-
-    Route::get('/student/analytics', [TestController::class, 'studentAnalytics'])->name('student.analytics');
-
-
-    // Route::get('/take-test/{test}', [TestController::class, 'takeTest'])->name('tests.take');
-
-    Route::post('/tests/{id}/submit', [TestController::class, 'submitTest'])->name('tests.submit');
-
-    Route::post('/tests/save-answer', [TestController::class, 'saveAnswer'])->name('tests.saveAnswer');
-
-
-    Route::middleware('role:admin')->group(function () {
-        Route::get('/schedule-test', [TestController::class, 'schedule'])->name('tests.schedule');
-        Route::post('/schedule-test/{id}', [TestController::class, 'saveSchedule'])->name('tests.saveSchedule');
-        Route::post('/tests/{id}/cancel-schedule', [TestController::class, 'cancelSchedule'])->name('tests.cancelSchedule');
-    });
-
-
-
-    Route::get('/calendar/events', [TestController::class, 'calendarEvents'])->name('calendar.events');
-
-
-    Route::get('/start-test', [TestController::class, 'startTest'])->name('tests.start');
-    Route::get('/my-tests', [TestController::class, 'viewTests'])->name('tests.student');
-
-    Route::get('/test/{id}/take', [TestController::class, 'takeTest'])->name('tests.take');
-
-
-    Route::middleware('role:admin')->group(function () {
-        Route::post('/tests/{id}/force-stop', [TestController::class, 'forceStop'])->name('tests.forceStop');
-    });
-
-
-    Route::get('/announcements', [AnnouncementController::class, 'index'])->name('announcements.index');
-    Route::middleware('role:admin')->group(function () {
-        Route::get('/announcements/create', [AnnouncementController::class, 'create'])->name('announcements.create');
-        Route::post('/announcements', [AnnouncementController::class, 'store'])->name('announcements.store');
-
-        Route::get('/announcements/{announcement}/edit', [AnnouncementController::class, 'edit'])->name('announcements.edit');
-        Route::put('/announcements/{announcement}', [AnnouncementController::class, 'update'])->name('announcements.update');
-        Route::delete('/announcements/{announcement}', [AnnouncementController::class, 'destroy'])->name('announcements.destroy');
-    });
-
-    Route::post('/announcements/mark-all-read', [AnnouncementController::class, 'markAllAsRead'])
-        ->name('announcements.markAllRead');
-
-    Route::post('/announcements/{id}/mark-read', [AnnouncementController::class, 'markAsRead'])->name('announcements.markAsRead');
-
 
     Route::middleware('role:admin,examiner')->group(function () {
         Route::post('/summernote/upload-image', [SummernoteController::class, 'uploadImage'])->name('summernote.image.upload');
     });
 
+    // The retired school screens: off unless LEGACY_SCHOOL=true (see App\Http\Middleware\LegacySchool).
+    Route::middleware('legacy')->group(function () {
+        Route::get('/calendar', function () {
+            return view('calendar');
+        })->name('calendar');
+
+        Route::middleware('role:admin')->group(function () {
+            Route::get('/add-section', [SectionController::class, 'create'])->name('section.create');
+            Route::get('/manage-sections', [SectionController::class, 'index'])->name('section.index');
+            Route::get('/add-section', [SectionController::class, 'create'])->name('section.create');
+            Route::post('/add-section', [SectionController::class, 'store'])->name('section.store');
+            Route::get('/add_section', [SectionController::class, 'showSections'])->name('add_section');
+
+            // Update your route definition to accept an ID parameter
+            Route::get('/edit_section/{id}', [SectionController::class, 'edit'])->name('edit_section');
+
+            // Add this update route for form submission
+            Route::put('/section/{id}', [SectionController::class, 'update'])->name('section.update');
+
+            // For deleting a section (this should match exactly what you have)
+            Route::delete('/delete_section/{id}', [SectionController::class, 'destroy'])->name('delete_section');
+
+            Route::get('/add-user', [UserController::class, 'create'])->name('user.add');
+            Route::post('/add-user', [UserController::class, 'store'])->name('user.store');
+
+            Route::get('/add-teacher', [UserController::class, 'create'])->name('teacher.add');
+            Route::post('/add-teacher', [UserController::class, 'store'])->name('teacher.store');
+
+            Route::get('/manage-user', [UserController::class, 'manageUsers'])->name('users.index');
+            Route::get('/edit-user/{id}', [UserController::class, 'edit'])->name('users.edit');
+            Route::patch('users/toggle-active/{id}', [UserController::class, 'toggleActive'])->name('users.toggleActive');
+
+            Route::get('/reset-password/{encryptedId}', [UserController::class, 'resetPassword'])->name('users.reset');
+    
+            Route::delete('/delete-user/{id}', [UserController::class, 'destroy'])->name('users.destroy');
+            Route::put('/edit-user/{id}', [UserController::class, 'update'])->name('users.update');
 
 
+            Route::get('/add-teacher', [UserController::class, 'createTeacher'])->name('teacher.add');
+            Route::post('/add-teacher', [UserController::class, 'storeTeacher'])->name('teacher.store');
+
+            Route::get('/manage-teacher', [UserController::class, 'manageTeacher'])->name('teachers.index');
+            Route::get('/get-classes-by-sections', [UserController::class, 'getClassesBySections'])->name('sections.classes');
+
+            Route::get('/edit-teacher/{id}', [UserController::class, 'editTeacher'])->name('teachers.edit');
+            Route::patch('teachers/toggle-active/{id}', [UserController::class, 'toggleActiveTeacher'])->name('teachers.toggleActive');
+
+            Route::get('/reset-password/{id}', [UserController::class, 'resetPasswordTeacher'])->name('teachers.reset');
+            Route::delete('/delete-teacher/{id}', [UserController::class, 'destroyTeacher'])->name('teachers.destroy');
+            Route::put('/edit-teacher/{id}', [UserController::class, 'updateTeacher'])->name('teachers.update');
+        });
+
+        Route::middleware('role:admin')->group(function () {
+            Route::get('/add-school-class', [SchoolClassController::class, 'create'])->name('schoolClass.add');
+            Route::get('/manage-school-classes', [SchoolClassController::class, 'index'])->name('schoolClass.manage');
+            Route::post('/store-school-class', [SchoolClassController::class, 'store'])->name('schoolClass.store');
+
+            Route::get('/edit-school-class/{id}', [SchoolClassController::class, 'edit'])->name('schoolClass.edit');
+            Route::delete('/delete-school-class/{id}', [SchoolClassController::class, 'destroy'])->name('schoolClass.delete');
+
+            Route::put('/update-school-class/{id}', [SchoolClassController::class, 'update'])->name('schoolClass.update');
+
+            Route::get('/courses/add', [CourseController::class, 'create'])->name('course.create');
+            Route::post('/courses/add', [CourseController::class, 'store'])->name('course.store');
+            Route::get('/courses/manage', [CourseController::class, 'index'])->name('course.manage');
+
+            Route::get('/courses/edit/{id}', [CourseController::class, 'edit'])->name('course.edit');
+
+            // Update after editing
+            Route::put('/courses/update/{id}', [CourseController::class, 'update'])->name('course.update');
+
+            // Delete
+            Route::delete('/courses/delete/{id}', [CourseController::class, 'destroy'])->name('course.delete');
+        });
+
+        Route::middleware('role:admin,examiner')->group(function () {
+            Route::get('/tests/create', [TestController::class, 'create'])->name('tests.create');
+            // Route::post('/tests', [TestController::class, 'store'])->name('tests.store');
+            Route::get('/tests', [TestController::class, 'index'])->name('tests.index');
+            Route::get('/tests/{id}/edit', [TestController::class, 'edit'])->name('tests.edit');
+            Route::put('/tests/{id}', [TestController::class, 'update'])->name('tests.update');
+            Route::delete('/tests/{id}', [TestController::class, 'destroy'])->name('tests.destroy');
+            Route::get('/sections/{id}/classes', [TestController::class, 'getClassesBySection'])->name('sections.classes');
+            Route::post('/tests/store', [TestController::class, 'store'])->name('tests.store');
+            Route::get('/tests/{id}', [TestController::class, 'show'])->name('tests.show');
+        });
+
+        Route::middleware('role:admin')->group(function () {
+            Route::get('/get-subjects-by-section/{sectionId}', [UserController::class, 'getSubjectsBySection']);
+        });
+
+        Route::middleware('role:admin,examiner')->group(function () {
+            Route::get('/questions', [QuestionController::class, 'index'])->name('questions.index');
+            Route::get('/tests/{test}/set-questions', [QuestionController::class, 'setQuestions'])->name('tests.setQuestions');
+            Route::post('/questions/store', [QuestionController::class, 'store'])->name('questions.store');
+            Route::get('/tests/{test}/questions', [QuestionController::class, 'setQuestions'])->name('questions.set');
+            Route::get('/questions/view/{test}', [QuestionController::class, 'viewQuestions'])->name('questions.view');
+            Route::post('/tests/{test}/submit-for-approval', [QuestionController::class, 'submitForApproval'])->name('tests.submitForApproval');
+        });
+
+        Route::get('/view-tests', [TestController::class, 'viewTests'])->name('tests.view');
+        Route::middleware('role:admin')->group(function () {
+            Route::get('/tests/{test}/approve', [TestController::class, 'approveTest'])->name('tests.approve');
+            Route::get('/tests/{test}/check', [TestController::class, 'editCheck'])->name('tests.check');
+            Route::delete('/tests/{test}', [TestController::class, 'deleteTest'])->name('tests.delete');
+            Route::post('/tests/{test}/comment', [TestController::class, 'submitComment'])->name('tests.comment');
+        });
+
+
+
+        Route::middleware('role:admin,examiner')->group(function () {
+            Route::get('/students/create', [StudentController::class, 'create'])->name('students.create');
+            Route::get('/students', [StudentController::class, 'index'])->name('students.index');
+
+            Route::get('/get-classes/{section_id}', [StudentController::class, 'getClasses']);
+
+    
+
+            Route::post('/students', [StudentController::class, 'store'])->name('students.store');
+            Route::get('/students/{student}/edit', [StudentController::class, 'edit'])->name('students.edit');
+            Route::put('/students/{student}', [StudentController::class, 'update'])->name('students.update');
+            Route::delete('/students/{student}', [StudentController::class, 'destroy'])->name('students.destroy');
+
+            Route::patch('/students/{student}/suspend', [StudentController::class, 'suspend'])->name('students.suspend');
+            Route::patch('/students/{student}/activate', [StudentController::class, 'activate'])->name('students.activate');
+            Route::patch('/students/{student}/reset-password', [StudentController::class, 'resetPassword'])->name('students.reset_password');
+        });
+
+        Route::get('/available-tests', [TestController::class, 'available'])->name('tests.available');
+        Route::get('/past-tests', [TestController::class, 'past'])->name('tests.past');
+        Route::get('/past-tests/view/{testId}', [TestController::class, 'viewPast'])->name('tests.viewPast');
+
+        Route::get('/student/analytics', [TestController::class, 'studentAnalytics'])->name('student.analytics');
+
+
+        // Route::get('/take-test/{test}', [TestController::class, 'takeTest'])->name('tests.take');
+
+        Route::post('/tests/{id}/submit', [TestController::class, 'submitTest'])->name('tests.submit');
+
+        Route::post('/tests/save-answer', [TestController::class, 'saveAnswer'])->name('tests.saveAnswer');
+
+
+        Route::middleware('role:admin')->group(function () {
+            Route::get('/schedule-test', [TestController::class, 'schedule'])->name('tests.schedule');
+            Route::post('/schedule-test/{id}', [TestController::class, 'saveSchedule'])->name('tests.saveSchedule');
+            Route::post('/tests/{id}/cancel-schedule', [TestController::class, 'cancelSchedule'])->name('tests.cancelSchedule');
+        });
+
+
+
+        Route::get('/calendar/events', [TestController::class, 'calendarEvents'])->name('calendar.events');
+
+
+        Route::get('/start-test', [TestController::class, 'startTest'])->name('tests.start');
+        Route::get('/my-tests', [TestController::class, 'viewTests'])->name('tests.student');
+
+        Route::get('/test/{id}/take', [TestController::class, 'takeTest'])->name('tests.take');
+
+
+        Route::middleware('role:admin')->group(function () {
+            Route::post('/tests/{id}/force-stop', [TestController::class, 'forceStop'])->name('tests.forceStop');
+        });
+
+
+        Route::get('/announcements', [AnnouncementController::class, 'index'])->name('announcements.index');
+        Route::middleware('role:admin')->group(function () {
+            Route::get('/announcements/create', [AnnouncementController::class, 'create'])->name('announcements.create');
+            Route::post('/announcements', [AnnouncementController::class, 'store'])->name('announcements.store');
+
+            Route::get('/announcements/{announcement}/edit', [AnnouncementController::class, 'edit'])->name('announcements.edit');
+            Route::put('/announcements/{announcement}', [AnnouncementController::class, 'update'])->name('announcements.update');
+            Route::delete('/announcements/{announcement}', [AnnouncementController::class, 'destroy'])->name('announcements.destroy');
+        });
+
+        Route::post('/announcements/mark-all-read', [AnnouncementController::class, 'markAllAsRead'])
+            ->name('announcements.markAllRead');
+
+        Route::post('/announcements/{id}/mark-read', [AnnouncementController::class, 'markAsRead'])->name('announcements.markAsRead');
+
+
+
+
+
+
+    });
 
     // Route::get('/questions/create', [QuestionController::class, 'create'])->name('questions.create');
     // Route::post('/questions', [QuestionController::class, 'store'])->name('questions.store');

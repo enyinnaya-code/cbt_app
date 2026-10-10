@@ -15,7 +15,7 @@
   var LETTERS = ['A', 'B', 'C', 'D', 'E'];
   var INSTANT = S.mode === 'instant';
 
-  var state = { i: 0, answers: {}, revealed: {}, shownAt: {}, review: false, finished: false, lang: S.lang || 'en' };
+  var state = { i: 0, answers: {}, revealed: {}, shownAt: {}, times: {}, review: false, finished: false, lang: S.lang || 'en' };
 
   var $ = function (id) { return document.getElementById(id); };
   var el = {
@@ -71,6 +71,7 @@
   function saveQueue() { try { localStorage.setItem(QKEY, JSON.stringify(queue)); } catch (e) {} }
 
   function enqueue(question, selected) {
+    state.times[question.id] = Math.min(3600000, Date.now() - (state.shownAt[question.id] || Date.now()));
     queue.push({
       client_uuid: uuid(),
       question_id: question.id,
@@ -282,6 +283,69 @@
     showResults();
   }
 
+  function esc(text) { var d = document.createElement('div'); d.textContent = text == null ? '' : String(text); return d.innerHTML; }
+
+  function encouragement(pct, answered) {
+    if (!answered) { return 'No answers this time. Try a few, even a guess teaches you something.'; }
+    if (pct === 100) { return 'Perfect score! Outstanding.'; }
+    if (pct >= 80) { return 'Excellent! You are getting stronger.'; }
+    if (pct >= 60) { return 'Good work. Review the ones you missed and the score will climb.'; }
+    if (pct >= 40) { return 'A fair start. The review below shows exactly what to fix.'; }
+    return 'This topic is tough right now, and that is useful to know. Read the explanations and try again.';
+  }
+
+  /* Strongest and weakest topic and average time, from this session only. Needs 2+ answers in a topic to compare. */
+  function analysis(answered) {
+    if (!answered) { return ''; }
+    var byTopic = {}, ms = 0, timed = 0;
+    Q.forEach(function (question) {
+      if (!state.answers[question.id]) { return; }
+      if (state.times[question.id] != null) { ms += state.times[question.id]; timed++; }
+      if (!question.topic) { return; }
+      var t = byTopic[question.topic] || (byTopic[question.topic] = { n: 0, right: 0 });
+      t.n++; if (isCorrect(question)) { t.right++; }
+    });
+    var topics = Object.keys(byTopic).map(function (name) { return { name: name, n: byTopic[name].n, pct: Math.round(byTopic[name].right / byTopic[name].n * 100) }; })
+      .filter(function (t) { return t.n >= 2; }).sort(function (a, b) { return b.pct - a.pct; });
+
+    var rows = '';
+    if (timed) { rows += '<div class="stat"><span class="tiny muted">Average time per question</span><span class="h3">' + Math.round(ms / timed / 1000) + ' seconds</span></div>'; }
+    if (topics.length > 1) {
+      var best = topics[0], worst = topics[topics.length - 1];
+      rows += '<div class="stat"><span class="tiny muted">Strongest topic</span><span class="h3">' + esc(best.name) + ' (' + best.pct + '%)</span></div>';
+      if (worst.pct < 100) { rows += '<div class="stat"><span class="tiny muted">Needs practice</span><span class="h3">' + esc(worst.name) + ' (' + worst.pct + '%)</span></div>'; }
+    }
+    return rows ? '<div class="grid3">' + rows + '</div>' : '';
+  }
+
+  /* Daily challenge: once the answers have reached the server, ask it to mark the challenge complete and pay the bonus. */
+  function claimChallenge(tries) {
+    var box = $('challenge-reward');
+    if (!box || !S.endpoints.complete) { return; }
+    if (queue.length && tries < 8) { flush(); setTimeout(function () { claimChallenge(tries + 1); }, 700); return; }
+
+    fetch(S.endpoints.complete, {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf }
+    }).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+      if (!d) { return; }
+      if (!d.done) { box.innerHTML = '<div class="alert">Answer every question to finish the daily challenge.</div>'; return; }
+      var html = '<div class="card primary stack center" style="gap:6px"><p class="h2">' + (d.newly ? 'Challenge complete!' : 'Challenge already done today') + '</p>' +
+        '<p>' + d.correct + ' of ' + d.total + ' correct' + (d.newly ? ' · +' + d.xp + ' XP' : '') + '</p>' +
+        '<p class="small">Level ' + d.level.level + ' · ' + esc(d.level.title) + ' · ' + d.level.xp + ' XP</p>';
+      (d.badges || []).forEach(function (b) { html += '<p class="small" style="font-weight:700">New badge: ' + esc(b.title) + ' (' + esc(b.text) + ')</p>'; });
+      box.innerHTML = html + '</div>';
+    }).catch(function () {});
+  }
+
+  function unlockCard() {
+    var u = S.unlock;
+    if (!u || !u.url) { return ''; }
+    return '<div class="card stack" style="gap:8px;background:var(--accent-soft)"><p class="h3">Want more ' + esc(u.subject) + ' questions?</p>' +
+      '<p class="small">That was the free sample. Unlock the full subject' + (u.price > 0 ? ' for \u20A6' + Number(u.price).toLocaleString() : '') + '.</p>' +
+      '<a class="btn btn-p btn-sm" style="align-self:flex-start" href="' + esc(u.url) + '">Unlock ' + esc(u.subject) + '</a></div>';
+  }
+
   function showResults() {
     var total = N;
     var right = Q.filter(isCorrect).length;
@@ -307,11 +371,17 @@
       '<div class="grid3"><div class="stat"><span class="tiny muted">Correct</span><span class="h3">' + right + '</span></div>' +
       '<div class="stat"><span class="tiny muted">Wrong</span><span class="h3">' + (answered - right) + '</span></div>' +
       '<div class="stat"><span class="tiny muted">Skipped</span><span class="h3">' + (total - answered) + '</span></div></div>' +
+      '<p class="center small" style="font-weight:600">' + encouragement(pct, answered) + '</p>' +
+      '<div id="challenge-reward"></div>' +
+      unlockCard() +
+      analysis(answered) +
       '<div class="row wrap" style="justify-content:center">' +
         '<button class="btn btn-o" id="btn-review" type="button">Review answers</button>' +
         '<a class="btn btn-p" href="' + S.endpoints.exit + '">Practise again</a>' +
         '<a class="btn btn-t" href="' + S.endpoints.home + '">Home</a>' +
       '</div>';
+
+    if (S.kind === 'challenge') { claimChallenge(0); }
 
     $('btn-review').addEventListener('click', function () {
       state.review = true; state.i = 0;

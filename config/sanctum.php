@@ -50,7 +50,8 @@ return [
     |
     */
 
-    'expiration' => null,
+    // A phone that has not signed in for 90 days must sign in again; a stolen token does not work forever.
+    'expiration' => 60 * 24 * 90,
 
     /*
     |--------------------------------------------------------------------------

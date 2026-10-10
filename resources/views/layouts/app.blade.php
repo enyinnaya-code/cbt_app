@@ -30,6 +30,8 @@
             ['Practice', 'practice.index', 'book', 'practice.*'],
             ['Mock', 'mock.index', 'clock', 'mock.*'],
             ['Progress', 'progress', 'chart', 'progress'],
+            ['Revision', 'revision', 'refresh', 'revision'],
+            ['Rankings', 'rankings', 'trophy', ['rankings', 'rankings.*']],
             ['Saved', 'saved', 'bookmark', 'saved'],
         ];
     // Phones have room for five tabs: keep the ones staff use daily.
@@ -87,6 +89,7 @@
     @if(session('success'))<div class="alert ok" role="status">{{ session('success') }}</div>@endif
     @if(session('error'))<div class="alert err" role="alert">{{ session('error') }}</div>@endif
     @yield('content')
+    @include('layouts._credit')
 </main>
 
 <nav class="bottom-nav" aria-label="Main">

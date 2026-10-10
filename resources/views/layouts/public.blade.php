@@ -45,9 +45,10 @@
             </div>
             <div><h4>Learn</h4><a href="{{ route('register') }}">Create a free account</a><a href="{{ route('pricing') }}">Pricing</a><a href="{{ route('download') }}">Get the app</a></div>
             <div><h4>Stay informed</h4><a href="{{ route('news') }}">News</a><a href="{{ route('scholarships') }}">Scholarships</a><a href="{{ route('events') }}">Events</a><a href="{{ route('videos') }}">Videos</a><a href="{{ route('blog') }}">Blog</a></div>
-            <div><h4>Account</h4><a href="{{ route('login') }}">Sign in</a><a href="{{ route('register') }}">Sign up</a>@if($support = \App\Models\Setting::get('support.email'))<a href="mailto:{{ $support }}">{{ $support }}</a>@endif</div>
+            <div><h4>Account</h4><a href="{{ route('login') }}">Sign in</a><a href="{{ route('register') }}">Sign up</a><a href="{{ route('privacy') }}">Privacy policy</a>@if($support = \App\Models\Setting::get('support.email'))<a href="mailto:{{ $support }}">{{ $support }}</a>@endif</div>
         </div>
         &copy; {{ date('Y') }} TestaCBT
+        @include('layouts._credit')
     </footer>
 </div>
 @endsection

@@ -86,6 +86,7 @@ download can resume from the byte it stopped at. The app stores it in SQLite; no
 { "attempts": [ {"client_uuid": "uuid", "question_id": 39, "mode": "practice|mock", "selected": "C",
                  "time_ms": 8200, "answered_at": "2026-09-26T17:47:37Z"} ],
   "bookmarks": [ {"question_id": 39, "bookmarked": true, "changed_at": "2026-09-26T17:47:37Z"} ],
+  "challenges": [ {"date": "2026-10-10", "question_ids": [39, 40, 41, 42, 43]} ],
   "mock_sessions": [ {"client_uuid": "uuid", "exam_id": 3, "score": 268, "total": 400, "duration_seconds": 6480,
                       "taken_at": "...", "subject_scores": [ {"subject_id": 1, "correct": 40, "total": 60} ]} ] }
 ```
@@ -97,6 +98,12 @@ Limits per request: 500 attempts, 500 bookmarks, 50 mock sessions. Response:
 - The server decides `is_correct` from the answer key. Anything the phone claims is ignored.
 - Passages and unknown question ids are counted in `rejected`, not errors. Use `selected: null` for a skipped question.
 - Bookmarks: the newest `changed_at` wins, so two phones cannot undo each other.
+- Daily challenge: the phone builds its own 10 questions offline, answers them like any practice, then lists the day and the
+  question ids under `challenges` (after the attempts, in the same request or later). The server recounts the score from the stored
+  answers and pays the 100 XP bonus once per day across all devices; if the website already paid that day, nothing more is paid.
+  The response's `challenges` says what happened (`done`, `newly`, `correct`, `total`, `xp`). Claims older than 3 days, dated in
+  the future, or for questions the student cannot open are refused. `GET /sync/progress` returns completed challenges as
+  `challenges: [{date, correct, total, xp}]` so any phone shows the same XP.
 - Send times in UTC (ISO-8601). Dates more than a day in the future are pulled back to now.
 
 `GET /sync/progress?cursor=<n>&since=<iso8601>` restores progress on a new phone or catches up.
@@ -107,7 +114,7 @@ offset (`2026-09-26T18:47:37+01:00`).
 ## Server side
 
 ```
-php artisan testacbt:publish-papers --all --build   # publish draft papers and build packs
+php artisan testacbt:publish-papers --all           # publish draft papers; their packs are built automatically
 php artisan testacbt:build-packs                    # rebuild packs (only changed ones get a new version)
 ```
 

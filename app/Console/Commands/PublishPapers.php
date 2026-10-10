@@ -11,7 +11,8 @@ class PublishPapers extends Command
         {ids?* : Paper ids to change}
         {--all : Every paper that is currently a draft (or, with --unpublish, every published one)}
         {--unpublish : Move papers back to draft}
-        {--build : Rebuild the offline packs afterwards}';
+        {--build : Kept for old scripts; packs are rebuilt by default}
+        {--no-build : Do not rebuild the offline packs afterwards (they are rebuilt by default)}';
 
     protected $description = 'Publish papers (or move them back to draft) so students can download them';
 
@@ -39,7 +40,7 @@ class PublishPapers extends Command
 
         $this->info(($unpublish ? 'Moved to draft: ' : 'Published: ') . $count . ' paper(s).');
 
-        if ($this->option('build')) {
+        if (! $this->option('no-build')) {
             $this->call('testacbt:build-packs');
         } elseif ($count) {
             $this->line('Run php artisan testacbt:build-packs to update the downloadable packs.');

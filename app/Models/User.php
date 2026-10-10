@@ -37,6 +37,12 @@ class User extends Authenticatable
         'target_exam_date',
     ];
 
+    /** The password-reset email: our own wording, and a link that leads to our own reset page. */
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new \App\Notifications\ResetPasswordNotification($token));
+    }
+
     public const ROLE_ADMIN = 'admin';
     public const ROLE_EXAMINER = 'examiner';
     public const ROLE_STUDENT = 'student';
@@ -92,6 +98,7 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'must_change_password' => 'boolean',
             'password' => 'hashed',
             'preferred_exams' => 'array',
             'target_exam_date' => 'date',

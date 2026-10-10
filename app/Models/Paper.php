@@ -20,6 +20,13 @@ class Paper extends Model
         return ['published_at' => 'datetime'];
     }
 
+    protected static function booted(): void
+    {
+        // Publishing, unpublishing, moving or deleting a paper changes the packs students download.
+        static::saved(fn (Paper $paper) => app(\App\Services\PackRefresher::class)->markPaper($paper));
+        static::deleted(fn (Paper $paper) => app(\App\Services\PackRefresher::class)->markPaper($paper));
+    }
+
     public function exam()
     {
         return $this->belongsTo(Exam::class);

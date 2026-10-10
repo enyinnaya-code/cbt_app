@@ -17,6 +17,7 @@ export interface SettingsState {
 }
 
 const KEY = 'settings';
+export const DIRTY_KEY = 'settings.dirty';
 
 type Saved = Pick<SettingsState, 'theme' | 'lang' | 'wifiOnly' | 'targetExam' | 'targetExamDate' | 'seenWelcome'>;
 
@@ -35,6 +36,8 @@ export const useSettings = create<SettingsState>((set, get) => ({
 
   async set(patch) {
     set(patch);
+    // Language and the exam countdown follow the student to the website and other phones: flag the change so the next sync sends it.
+    if ('lang' in patch || 'targetExam' in patch || 'targetExamDate' in patch) await kvSet(services().db, DIRTY_KEY, '1');
     const s = get();
     const toSave: Saved = { theme: s.theme, lang: s.lang, wifiOnly: s.wifiOnly, targetExam: s.targetExam, targetExamDate: s.targetExamDate, seenWelcome: s.seenWelcome };
     await kvSet(services().db, KEY, JSON.stringify(toSave));

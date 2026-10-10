@@ -21,6 +21,7 @@ class AppServiceProvider extends ServiceProvider
     {
         // One per request, so the list of exams is looked up once however many places print it.
         $this->app->singleton(\App\Support\SiteInfo::class);
+        $this->app->singleton(\App\Services\PackRefresher::class);
     }
 
     /**
@@ -30,6 +31,17 @@ class AppServiceProvider extends ServiceProvider
 
    public function boot()
 {
+    // A production site must never print stack traces, file paths or settings, even if APP_DEBUG was left on by mistake.
+    if ($this->app->isProduction()) {
+        config(['app.debug' => false]);
+    }
+
+    // The email account an admin saved in Site settings. A missing settings table (before the first migration) must not stop the app.
+    try {
+        app(\App\Services\MailSettings::class)->apply();
+    } catch (\Throwable) {
+    }
+
     Paginator::useBootstrapFour();
 
     View::composer('includes.right_top_nav', function ($view) {
