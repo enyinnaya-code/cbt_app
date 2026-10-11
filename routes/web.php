@@ -132,6 +132,7 @@ Route::middleware(['auth'])->group(function () {
             Route::put('settings', [Console\SettingsController::class, 'update'])->name('settings.update');
             Route::put('settings/paystack', [Console\SettingsController::class, 'paystack'])->name('settings.paystack');
             Route::post('settings/paystack/check', [Console\SettingsController::class, 'paystackCheck'])->middleware('throttle:5,1')->name('settings.paystack.check');
+            Route::post('settings/apk-piece', [Console\SettingsController::class, 'apkPiece'])->middleware('throttle:600,10')->name('settings.apk.piece');
             Route::put('settings/mail', [Console\SettingsController::class, 'mail'])->name('settings.mail');
             Route::post('settings/mail/test', [Console\SettingsController::class, 'testMail'])->middleware('throttle:5,1')->name('settings.mail.test');
 

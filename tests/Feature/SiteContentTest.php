@@ -172,6 +172,50 @@ class SiteContentTest extends TestCase
         $this->actingAs($admin)->get('/console/settings')->assertOk()->assertSee('Offered on the website now')->assertSee('the file uploaded here');
     }
 
+    private function piece(string $id, int $index, int $total, string $bytes, ?string $version = null)
+    {
+        return $this->actingAs($this->makeUser(2))->postJson('/console/settings/apk-piece', [
+            'upload_id' => $id, 'index' => $index, 'total' => $total, 'version' => $version,
+            'piece' => \Illuminate\Http\UploadedFile::fake()->createWithContent("p{$index}", $bytes),
+        ]);
+    }
+
+    public function test_the_app_can_be_uploaded_in_pieces_and_is_joined_in_order(): void
+    {
+        $dir = $this->tempPublic();
+        $id = str_repeat('a', 32);
+
+        $this->piece($id, 1, 3, 'BBBB')->assertOk()->assertJson(['done' => false]);
+        $this->piece($id, 0, 3, "PK\x03\x04AAAA")->assertOk()->assertJson(['done' => false]);
+        $this->piece($id, 2, 3, 'CCCC', '1.1.2')->assertOk()->assertJson(['done' => true]);
+
+        $this->assertSame("PK\x03\x04AAAABBBBCCCC", file_get_contents($dir . '/downloads/TestaCBT-upload.apk'));
+        $this->assertSame('1.1.2', \App\Models\Setting::get('app.apk_version'));
+        $this->get('/')->assertSee('/downloads/TestaCBT-upload.apk', false)->assertSee('Version 1.1.2');
+        $this->assertSame([], glob(storage_path("app/apk-pieces/{$id}/*")) ?: [], 'the pieces are cleaned up');
+    }
+
+    public function test_pieces_that_are_not_an_android_app_are_refused_and_removed(): void
+    {
+        $dir = $this->tempPublic();
+        $id = str_repeat('b', 32);
+
+        $this->piece($id, 0, 1, '<?php echo "hi";')->assertStatus(422);
+
+        $this->assertFileDoesNotExist($dir . '/downloads/TestaCBT-upload.apk');
+        $this->assertSame([], glob(storage_path("app/apk-pieces/{$id}/*")) ?: []);
+    }
+
+    public function test_piece_uploads_are_for_admins_and_reject_odd_ids(): void
+    {
+        $this->tempPublic();
+        $piece = \Illuminate\Http\UploadedFile::fake()->createWithContent('p', "PK\x03\x04");
+
+        $this->actingAs($this->makeUser(3))->postJson('/console/settings/apk-piece', ['upload_id' => str_repeat('c', 32), 'index' => 0, 'total' => 1, 'piece' => $piece])->assertForbidden();
+        $this->actingAs($this->makeUser(4))->postJson('/console/settings/apk-piece', ['upload_id' => str_repeat('c', 32), 'index' => 0, 'total' => 1, 'piece' => $piece])->assertForbidden();
+        $this->actingAs($this->makeUser(2))->postJson('/console/settings/apk-piece', ['upload_id' => '../../etc', 'index' => 0, 'total' => 1, 'piece' => $piece])->assertStatus(422);
+    }
+
     public function test_the_newest_app_file_is_the_one_offered(): void
     {
         $dir = $this->releaseBuild('2.0.0', time() - 3600);

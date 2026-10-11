@@ -24,6 +24,13 @@
             @endif
             <input id="apk_file" name="apk_file" type="file" class="input" accept=".apk,application/vnd.android.package-archive" style="padding:10px 14px">
             <span class="hint">Choosing a file replaces the current one. Up to 300 MB. This server accepts uploads up to <b>{{ \App\Http\Controllers\Console\SettingsController::formatBytes($uploadLimit) }}</b>{{ $uploadLimit > 0 && $uploadLimit < 100 * 1048576 ? ', so a bigger app needs the server limit raised (or use the link box below)' : '' }}.</span></div>
+        <div class="field" id="apk-pieces" data-url="{{ route('console.settings.apk.piece') }}" data-token="{{ csrf_token() }}">
+            <label for="apk_pieces_file">Or upload in pieces <span class="muted">(works on any server, even when the upload limit is small)</span></label>
+            <input id="apk_pieces_file" type="file" class="input" accept=".apk,application/vnd.android.package-archive" style="padding:10px 14px">
+            <div class="row" style="gap:10px;align-items:center"><button type="button" class="btn btn-o btn-sm" id="apk-pieces-go">Upload now</button>
+                <span class="small muted" id="apk-pieces-note">Uploads straight away, using the version typed below. No need to press Save.</span></div>
+            <div style="height:8px;border-radius:6px;background:var(--surface-2);overflow:hidden;display:none" id="apk-pieces-bar"><div style="height:100%;width:0;background:var(--primary);transition:width .2s" id="apk-pieces-fill"></div></div>
+        </div>
         <div class="grid2">
             <div class="field"><label for="app_apk_version">App version <span class="muted">(shown next to the button)</span></label><input id="app_apk_version" name="app_apk_version" class="input" value="{{ old('app_apk_version', $values['app.apk_version']) }}" maxlength="20" placeholder="1.0.0"></div>
             <div class="field"><label for="app_apk_url">Or a link to the file hosted elsewhere <span class="muted">(optional)</span></label><input id="app_apk_url" name="app_apk_url" type="url" class="input" value="{{ old('app_apk_url', $values['app.apk_url']) }}" placeholder="https://"></div>
@@ -167,4 +174,50 @@
     </div>
     @endif
 </section>
+<script>
+(function () {
+    var box = document.getElementById('apk-pieces');
+    if (!box) { return; }
+    var fileInput = document.getElementById('apk_pieces_file'), go = document.getElementById('apk-pieces-go');
+    var note = document.getElementById('apk-pieces-note'), bar = document.getElementById('apk-pieces-bar'), fill = document.getElementById('apk-pieces-fill');
+    var PIECE = 1024 * 1024;
+
+    function say(text, bad) { note.textContent = text; note.style.color = bad ? 'var(--danger)' : ''; }
+    function newId() { var a = new Uint8Array(16); crypto.getRandomValues(a); return Array.prototype.map.call(a, function (x) { return ('0' + x.toString(16)).slice(-2); }).join(''); }
+
+    function sendPiece(id, file, index, total, version, tries) {
+        var form = new FormData();
+        form.append('upload_id', id); form.append('index', index); form.append('total', total); form.append('version', version);
+        form.append('piece', file.slice(index * PIECE, (index + 1) * PIECE), 'piece');
+        return fetch(box.getAttribute('data-url'), { method: 'POST', body: form, credentials: 'same-origin', headers: { 'X-CSRF-TOKEN': box.getAttribute('data-token'), 'Accept': 'application/json' } })
+            .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, body: j }; }); })
+            .catch(function () { return { ok: false, body: {}, network: true }; })
+            .then(function (res) {
+                if (res.ok) { return res.body; }
+                if (res.network && tries < 3) { say('Connection dropped, trying again...'); return sendPiece(id, file, index, total, version, tries + 1); }
+                var m = res.body && (res.body.message || (res.body.errors && Object.values(res.body.errors)[0][0]));
+                throw new Error(m || 'The upload stopped. Check your connection and try again.');
+            });
+    }
+
+    go.addEventListener('click', function () {
+        var file = fileInput.files[0];
+        if (!file) { say('Choose the .apk file first.', true); return; }
+        if (!/\.apk$/i.test(file.name)) { say('That is not an .apk file.', true); return; }
+        var total = Math.ceil(file.size / PIECE), id = newId(), version = document.getElementById('app_apk_version').value;
+        go.disabled = true; fileInput.disabled = true; bar.style.display = 'block'; fill.style.width = '0';
+        say('Uploading...');
+        var i = 0;
+        (function next() {
+            sendPiece(id, file, i, total, version, 0).then(function (r) {
+                i++;
+                fill.style.width = Math.round(i / total * 100) + '%';
+                if (r.done) { say('Done: ' + r.size + ' is now on the website. Reloading...'); setTimeout(function () { location.reload(); }, 1200); return; }
+                say('Uploading... ' + Math.round(i / total * 100) + '%');
+                next();
+            }).catch(function (e) { say(e.message, true); go.disabled = false; fileInput.disabled = false; });
+        })();
+    });
+})();
+</script>
 @endsection

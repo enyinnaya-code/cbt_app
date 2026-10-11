@@ -196,6 +196,77 @@ class SettingsController extends Controller
         Setting::put(['app.apk_size' => filesize($target), 'app.apk_updated_at' => now()->toIso8601String()]);
     }
 
+    /** The biggest app file accepted, and the biggest single piece of one. */
+    private const APK_MAX_BYTES = 300 * 1048576;
+    private const APK_PIECE_MAX = 2 * 1048576;
+
+    /**
+     * Receives the app file in small pieces (the browser cuts it up), so it works on a server whose upload limit is
+     * smaller than the app. When the last piece arrives the pieces are joined, checked to be an Android app, and put in place.
+     */
+    public function apkPiece(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate([
+            'upload_id' => ['required', 'regex:/^[a-f0-9]{32}$/'],
+            'index' => ['required', 'integer', 'min:0', 'max:1000'],
+            'total' => ['required', 'integer', 'min:1', 'max:1000'],
+            'piece' => ['required', 'file', 'max:' . intdiv(self::APK_PIECE_MAX, 1024)],
+            'version' => ['nullable', 'string', 'max:20'],
+        ]);
+        abort_if($data['index'] >= $data['total'], 422, 'That piece does not belong to this upload.');
+
+        $root = storage_path('app/apk-pieces');
+        $dir = "{$root}/{$data['upload_id']}";
+        if (! is_dir($dir) && ! @mkdir($dir, 0775, true) && ! is_dir($dir)) {
+            return response()->json(['message' => 'The server could not store the upload (storage/app is not writable).'], 500);
+        }
+        foreach (glob("{$root}/*", GLOB_ONLYDIR) ?: [] as $old) {
+            if ($old !== $dir && filemtime($old) < time() - 86400) { array_map('unlink', glob("{$old}/*") ?: []); @rmdir($old); }
+        }
+
+        $request->file('piece')->move($dir, sprintf('%04d', $data['index']));
+        $have = glob("{$dir}/[0-9][0-9][0-9][0-9]") ?: [];
+        if (count($have) < $data['total']) {
+            return response()->json(['done' => false, 'received' => count($have)]);
+        }
+
+        // Every piece is here: join them in order.
+        $joined = "{$dir}/joined.apk";
+        $out = fopen($joined, 'wb');
+        $size = 0;
+        for ($i = 0; $i < $data['total']; $i++) {
+            $part = sprintf('%s/%04d', $dir, $i);
+            if (! is_file($part)) { fclose($out); return response()->json(['message' => 'A piece went missing. Please start the upload again.'], 422); }
+            $size += filesize($part);
+            fwrite($out, (string) file_get_contents($part));
+        }
+        fclose($out);
+
+        $cleanup = function () use ($dir) { array_map('unlink', glob("{$dir}/*") ?: []); @rmdir($dir); };
+
+        $handle = fopen($joined, 'rb');
+        $magic = $handle ? fread($handle, 4) : '';
+        if ($handle) { fclose($handle); }
+        if ($size > self::APK_MAX_BYTES || $magic !== "PK\x03\x04") {
+            $cleanup();
+            return response()->json(['message' => $size > self::APK_MAX_BYTES ? 'The app file must be 300 MB or smaller.' : 'That does not look like an Android app file. Choose the .apk you built.'], 422);
+        }
+
+        $target = public_path(self::APK_PATH);
+        if (! is_dir(dirname($target)) || ! @rename($joined, $target)) {
+            if (! (is_dir(dirname($target)) && @copy($joined, $target))) {
+                $cleanup();
+                return response()->json(['message' => 'The file could not be saved because public/downloads is not writable by the server.'], 500);
+            }
+        }
+        $cleanup();
+
+        Setting::put(['app.apk_size' => filesize($target), 'app.apk_updated_at' => now()->toIso8601String()]);
+        if (filled($data['version'] ?? null)) { Setting::put(['app.apk_version' => $data['version']]); }
+
+        return response()->json(['done' => true, 'size' => self::formatBytes((int) filesize($target))]);
+    }
+
     /** The biggest file this server will accept in one upload: the smaller of upload_max_filesize and post_max_size. */
     public static function uploadLimitBytes(): int
     {
