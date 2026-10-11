@@ -1,4 +1,4 @@
-import { PASSAGE_MAX_QUESTIONS, candidates, choose, practiceSession, savedSession, seededRng, summarise, toSession } from '@/core/selector';
+import { PASSAGE_MAX_QUESTIONS, candidates, choose, practiceSession, progressOf, savedSession, seededRng, summarise, toSession } from '@/core/selector';
 import { instruction, makePack, mcq } from './helpers/fixtures';
 
 describe('candidates', () => {
@@ -125,5 +125,54 @@ describe('sessions', () => {
   it('summarises what is on the phone', () => {
     const many = makePack({ papers: [{ id: 1, year: 2019, items: [mcq(1), instruction(2), mcq(3)] }, { id: 2, year: 2021, items: [mcq(4)] }] });
     expect(summarise(many)).toEqual({ questions: 3, years: [2021, 2019] });
+  });
+});
+
+describe('questions the student has not met come first', () => {
+  const pack = makePack({ papers: [{ id: 1, year: 2020, items: Array.from({ length: 10 }, (_, i) => mcq(i + 1)) }, { id: 2, year: 2021, items: Array.from({ length: 10 }, (_, i) => mcq(i + 11)) }] });
+  const all = candidates(pack);
+
+  it('works through every question before any repeats', () => {
+    const seen = new Set<number>();
+    for (let round = 0; round < 4; round++) {
+      const ids = choose(all, 5, false, seededRng(round + 1), seen).map((c) => c.q.id);
+      expect(ids.filter((id) => seen.has(id))).toEqual([]);
+      ids.forEach((id) => seen.add(id));
+    }
+    expect(seen.size).toBe(20);
+  });
+
+  it('fills up with answered questions only when there are not enough new ones', () => {
+    const seen = new Set<number>([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]);
+    const ids = choose(all, 6, false, seededRng(3), seen).map((c) => c.q.id);
+
+    expect(ids).toHaveLength(6);
+    expect(ids).toEqual(expect.arrayContaining([18, 19, 20]));
+  });
+
+  it('counts a passage as new while any of its questions is, and keeps it together', () => {
+    const p = makePack({ papers: [{ id: 1, year: 2020, items: [mcq(50), instruction(100), mcq(1), mcq(2), mcq(3)] }] });
+    const ids = choose(candidates(p), 3, false, seededRng(1), new Set([50, 1, 2])).map((c) => c.q.id);
+
+    expect(ids).toEqual([1, 2, 3]);
+  });
+
+  it('keeps the paper order for one year, taking unanswered questions first', () => {
+    const year = candidates(pack, { year: 2020 });
+    const ids = choose(year, 4, true, seededRng(1), new Set([1, 2, 3, 4, 5, 6])).map((c) => c.q.id);
+
+    expect(ids).toEqual([7, 8, 9, 10]);
+    expect(choose(year, 4, true, seededRng(1), null).map((c) => c.q.id)).toEqual([1, 2, 3, 4]);
+  });
+
+  it('reports how many have been answered', () => {
+    expect(progressOf(all, new Set([1, 2, 99]))).toEqual({ total: 20, answered: 2, fresh: 18 });
+  });
+
+  it('is used by practice sessions', () => {
+    const seen = new Set<number>(Array.from({ length: 15 }, (_, i) => i + 1));
+    const s = practiceSession(pack, { count: 5, rng: seededRng(9), seen });
+
+    expect(s.questions.map((q) => q.id).sort((a, b) => a - b)).toEqual([16, 17, 18, 19, 20]);
   });
 });

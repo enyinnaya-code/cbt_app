@@ -112,6 +112,12 @@ export function bookmarks(db: Db): Promise<BookmarkRow[]> {
   );
 }
 
+/** Every question the student has answered on this phone (or that was restored from their account). */
+export async function answeredIds(db: Db): Promise<Set<number>> {
+  const rows = await db.getAllAsync<{ question_id: number }>('SELECT DISTINCT question_id FROM attempts');
+  return new Set(rows.map((r) => r.question_id));
+}
+
 export async function bookmarkedIds(db: Db): Promise<Set<number>> {
   const rows = await db.getAllAsync<{ question_id: number }>('SELECT question_id FROM bookmarks WHERE is_bookmarked = 1');
   return new Set(rows.map((r) => r.question_id));

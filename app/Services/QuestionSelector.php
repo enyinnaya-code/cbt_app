@@ -23,14 +23,30 @@ class QuestionSelector
     public const PASSAGE_MAX_QUESTIONS = 10;
 
     /** Exam order is kept when one year is chosen; with "all years" whole passage groups are shuffled together. */
-    public function practice(?Exam $exam, Subject $subject, ?int $year, int $count, ?int $topicId = null, ?int $seed = null, ?Access $access = null): array
+    public function practice(?Exam $exam, Subject $subject, ?int $year, int $count, ?int $topicId = null, ?int $seed = null, ?Access $access = null, ?array $seen = null): array
     {
         // $exam is null when practising a topic, which spans every exam that covers the subject.
         $candidates = $this->candidates(fn ($paper) => $paper->where('subject_id', $subject->id)
             ->when($exam, fn ($q) => $q->where('exam_id', $exam->id))
             ->when($year, fn ($q) => $q->where('year', $year)), $topicId, null, $access);
 
-        return $this->pick($candidates, $count, keepOrder: $year !== null, seed: $seed);
+        return $this->pick($candidates, $count, keepOrder: $year !== null, seed: $seed, seen: $seen);
+    }
+
+    /**
+     * How many of a subject's questions the student could be given, and how many of those they have not answered yet.
+     *
+     * @param  array<int,int>  $seen  question ids already answered
+     * @return array{total:int,answered:int,fresh:int}
+     */
+    public function progress(?Exam $exam, Subject $subject, ?int $year, ?int $topicId, array $seen, ?Access $access = null): array
+    {
+        $ids = $this->candidates(fn ($paper) => $paper->where('subject_id', $subject->id)
+            ->when($exam, fn ($q) => $q->where('exam_id', $exam->id))
+            ->when($year, fn ($q) => $q->where('year', $year)), $topicId, null, $access)->pluck('id');
+        $answered = $ids->intersect($seen)->count();
+
+        return ['total' => $ids->count(), 'answered' => $answered, 'fresh' => $ids->count() - $answered];
     }
 
     /**
@@ -199,22 +215,42 @@ class QuestionSelector
         return array_map(fn ($instructionId) => $groupSize[$instructionId] <= self::PASSAGE_MAX_QUESTIONS ? $instructionId : null, $owner);
     }
 
-    private function pick(Collection $candidates, int $count, bool $keepOrder, ?int $seed): array
+    private function pick(Collection $candidates, int $count, bool $keepOrder, ?int $seed, ?array $seen = null): array
     {
-        return $this->payload($this->choose($candidates, $count, $keepOrder, $seed));
+        return $this->payload($this->choose($candidates, $count, $keepOrder, $seed, $seen));
     }
 
-    private function choose(Collection $candidates, int $count, bool $keepOrder, ?int $seed): Collection
+    /**
+     * With $seen (ids the student already answered) the ones they have not met come first, so they work through the
+     * whole subject before anything repeats. A passage group counts as new while any of its questions is.
+     */
+    private function choose(Collection $candidates, int $count, bool $keepOrder, ?int $seed, ?array $seen = null): Collection
     {
-        if (! $keepOrder) {
-            // Shuffle whole passage groups (a lone question is its own group) so a passage never gets split up.
-            $candidates = $candidates
-                ->groupBy(fn (Question $q) => $q->passage_id ? 'p' . $q->passage_id : 'q' . $q->id)
-                ->shuffle($seed)
-                ->flatten(1);
+        $want = max(1, $count);
+        $seenSet = $seen === null ? null : array_flip($seen);
+        $fresh = fn (Question $q) => $seenSet === null || ! isset($seenSet[$q->id]);
+
+        if ($keepOrder) {
+            // One year keeps the paper's order: take the new questions in order, top up with seen ones, then restore the order.
+            if ($seenSet === null || $candidates->count() <= $want) { return $candidates->take($want)->values(); }
+            $pick = $candidates->filter($fresh)->take($want)->pluck('id')->all();
+            if (count($pick) < $want) {
+                $pick = array_merge($pick, $candidates->reject(fn ($q) => in_array($q->id, $pick, true))->take($want - count($pick))->pluck('id')->all());
+            }
+
+            return $candidates->filter(fn ($q) => in_array($q->id, $pick, true))->values();
         }
 
-        return $candidates->take(max(1, $count))->values();
+        // Shuffle whole passage groups (a lone question is its own group) so a passage never gets split up.
+        $groups = $candidates
+            ->groupBy(fn (Question $q) => $q->passage_id ? 'p' . $q->passage_id : 'q' . $q->id);
+        // With a seed the order is the same every time (Collection::shuffle() cannot be seeded), so everyone gets the same daily challenge.
+        $groups = $seed === null ? $groups->shuffle() : $groups->sortBy(fn ($g, $key) => crc32($seed . '|' . $key));
+        if ($seenSet !== null) {
+            $groups = $groups->filter(fn ($g) => $g->contains($fresh))->concat($groups->reject(fn ($g) => $g->contains($fresh)));
+        }
+
+        return $groups->flatten(1)->take($want)->values();
     }
 
     private function payload(Collection $questions, bool $withKey = true): array

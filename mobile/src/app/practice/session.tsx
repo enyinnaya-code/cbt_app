@@ -6,7 +6,7 @@ import { naira } from '@/core/format';
 import { practiceSession, savedSession } from '@/core/selector';
 import { buildViews } from '@/core/views';
 import type { Pack, SessionData } from '@/core/types';
-import { bookmarkedIds, bookmarks } from '@/db/progress';
+import { answeredIds, bookmarkedIds, bookmarks } from '@/db/progress';
 import { challengePlay, completeChallenge } from '@/services/challenge';
 import { recordAnswer, toggleBookmark } from '@/services/recorder';
 import { useData } from '@/state/data';
@@ -49,7 +49,8 @@ export default function PracticeSession() {
       } else {
         const pack = await packs.load(p.exam ?? '', p.subject ?? '');
         if (!pack) throw new Error('These questions are not on your phone. Download the subject first.');
-        built = practiceSession(pack, { year: p.year ? Number(p.year) : null, topicId: p.topic ? Number(p.topic) : null, count });
+        // Questions the student has not answered yet come first.
+        built = practiceSession(pack, { year: p.year ? Number(p.year) : null, topicId: p.topic ? Number(p.topic) : null, count, seen: await answeredIds(db) });
       }
 
       if (!built.questions.length) throw new Error('There are no questions for that choice. Try another year or topic.');

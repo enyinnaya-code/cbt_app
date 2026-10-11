@@ -104,7 +104,14 @@ class PracticeController extends Controller
             $topic = ! empty($data['topic']) ? \App\Models\Topic::where('subject_id', $subject->id)->find($data['topic']) : null;
             abort_if(! empty($data['topic']) && ! $topic, 404);
 
-            $picked = $selector->practice($exam, $subject, $data['year'] ?? null, $count, $topic?->id, null, Access::for($user));
+            // Questions this student has not answered yet come first, so they cover the whole subject before anything repeats.
+            $seen = DB::table('question_attempts')->where('user_id', $user->id)->distinct()->pluck('question_id')->all();
+            $access = Access::for($user);
+            $picked = $selector->practice($exam, $subject, $data['year'] ?? null, $count, $topic?->id, null, $access, $seen);
+            $left = $selector->progress($exam, $subject, $data['year'] ?? null, $topic?->id, $seen, $access);
+            if ($left['total'] > 0 && $left['fresh'] === 0) {
+                session()->now('success', 'You have answered every question here, so some will repeat. That is good revision.');
+            }
             // JAMB calls English "Use of English"; show each exam's own name for the subject.
             $title = ($exam?->subjects()->whereKey($subject->id)->first()?->pivot->display_name) ?: $subject->name;
             $subtitle = $topic

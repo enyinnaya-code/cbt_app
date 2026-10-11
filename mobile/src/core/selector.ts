@@ -86,21 +86,40 @@ function shuffle<T>(items: T[], rng: Rng): T[] {
   return a;
 }
 
-/** Keeps order when asked; otherwise shuffles whole passage groups (a lone question is its own group). */
-export function choose(cands: Candidate[], count: number, keepOrder: boolean, rng: Rng): Candidate[] {
-  let ordered = cands;
+/**
+ * Keeps order when asked; otherwise shuffles whole passage groups (a lone question is its own group).
+ *
+ * With `seen` (the ids the student has already answered) questions they have not met come first, so a student
+ * works through the whole subject before anything repeats. A passage group counts as new while any of its questions is.
+ * When one year is chosen the paper's order is kept: the new questions are taken in order, topped up with seen ones.
+ */
+export function choose(cands: Candidate[], count: number, keepOrder: boolean, rng: Rng, seen?: ReadonlySet<number> | null): Candidate[] {
+  const want = Math.max(1, count);
+  const fresh = (c: Candidate) => !seen || !seen.has(c.q.id);
 
-  if (!keepOrder) {
-    const groups = new Map<string, Candidate[]>();
-    for (const c of cands) {
-      const key = c.passageId !== null ? `p${c.paperId}-${c.passageId}` : `q${c.q.id}`;
-      const g = groups.get(key);
-      g ? g.push(c) : groups.set(key, [c]);
-    }
-    ordered = shuffle([...groups.values()], rng).flat();
+  if (keepOrder) {
+    if (!seen || cands.length <= want) return cands.slice(0, want);
+    const pick = new Set<Candidate>(cands.filter(fresh).slice(0, want));
+    for (const c of cands) { if (pick.size >= want) break; pick.add(c); }
+    return cands.filter((c) => pick.has(c));
   }
 
-  return ordered.slice(0, Math.max(1, count));
+  const groups = new Map<string, Candidate[]>();
+  for (const c of cands) {
+    const key = c.passageId !== null ? `p${c.paperId}-${c.passageId}` : `q${c.q.id}`;
+    const g = groups.get(key);
+    g ? g.push(c) : groups.set(key, [c]);
+  }
+  let ordered = shuffle([...groups.values()], rng);
+  if (seen) ordered = [...ordered.filter((g) => g.some(fresh)), ...ordered.filter((g) => !g.some(fresh))];
+
+  return ordered.flat().slice(0, want);
+}
+
+/** How many of a subject's questions the student has answered, so the setup screen can say so. */
+export function progressOf(cands: Candidate[], seen: ReadonlySet<number>): { total: number; answered: number; fresh: number } {
+  const answered = cands.filter((c) => seen.has(c.q.id)).length;
+  return { total: cands.length, answered, fresh: cands.length - answered };
 }
 
 /** Turns chosen candidates into what the session screens need, with each passage's text included once. */
@@ -135,9 +154,9 @@ export function toSession(pack: Pack, chosen: Candidate[]): SessionData {
 }
 
 /** Practice from one pack: a year (keeps paper order) or all years (mixed), optionally one topic. */
-export function practiceSession(pack: Pack, opts: { year?: number | null; topicId?: number | null; count: number; rng?: Rng }): SessionData {
+export function practiceSession(pack: Pack, opts: { year?: number | null; topicId?: number | null; count: number; rng?: Rng; seen?: ReadonlySet<number> | null }): SessionData {
   const cands = candidates(pack, { year: opts.year, topicId: opts.topicId });
-  return toSession(pack, choose(cands, opts.count, !!opts.year, opts.rng ?? Math.random));
+  return toSession(pack, choose(cands, opts.count, !!opts.year, opts.rng ?? Math.random, opts.seen));
 }
 
 /** Questions the student bookmarked, drawn from whichever packs hold them. */

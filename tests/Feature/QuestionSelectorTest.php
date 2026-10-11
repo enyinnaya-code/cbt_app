@@ -56,6 +56,51 @@ class QuestionSelectorTest extends TestCase
         $this->assertEqualsCanonicalizing([2019, 2020], array_unique(array_column($mixed['questions'], 'year')));
     }
 
+    public function test_questions_the_student_has_not_answered_come_first_so_nothing_repeats_until_all_are_done(): void
+    {
+        [$exam, $subject] = $this->makeExamAndSubject();
+        $paper = $this->makePaper($exam, $subject, 2020);
+        $ids = collect(range(1, 20))->map(fn ($i) => $this->makeQuestion($paper, "<p>Q$i</p>")->id)->all();
+        $selector = app(QuestionSelector::class);
+
+        $seen = [];
+        foreach (range(1, 4) as $round) {
+            $got = array_column($selector->practice($exam, $subject, null, 5, null, null, null, $seen)['questions'], 'id');
+            $this->assertSame([], array_intersect($got, $seen), "round {$round} repeated a question");
+            $seen = array_merge($seen, $got);
+        }
+        $this->assertEqualsCanonicalizing($ids, $seen);
+
+        // Everything done: it starts again rather than running dry.
+        $this->assertCount(5, $selector->practice($exam, $subject, null, 5, null, null, null, $seen)['questions']);
+        $this->assertSame(['total' => 20, 'answered' => 20, 'fresh' => 0], $selector->progress($exam, $subject, null, null, $seen));
+        $this->assertSame(['total' => 20, 'answered' => 3, 'fresh' => 17], $selector->progress($exam, $subject, null, null, array_slice($ids, 0, 3)));
+    }
+
+    public function test_one_year_keeps_paper_order_but_skips_what_was_answered(): void
+    {
+        [$exam, $subject] = $this->makeExamAndSubject();
+        $paper = $this->makePaper($exam, $subject, 2020);
+        $ids = collect(range(1, 10))->map(fn ($i) => $this->makeQuestion($paper, "<p>Q$i</p>")->id)->all();
+
+        $got = app(QuestionSelector::class)->practice($exam, $subject, 2020, 4, null, null, null, array_slice($ids, 0, 6))['questions'];
+
+        $this->assertSame(array_slice($ids, 6, 4), array_column($got, 'id'));
+    }
+
+    public function test_the_daily_challenge_is_not_affected_by_what_a_student_has_answered(): void
+    {
+        [$exam, $subject] = $this->makeExamAndSubject();
+        $paper = $this->makePaper($exam, $subject, 2020);
+        collect(range(1, 30))->each(fn ($i) => $this->makeQuestion($paper, "<p>Q$i</p>"));
+        $selector = app(QuestionSelector::class);
+
+        $a = array_column($selector->practice($exam, $subject, null, 10, null, 7)['questions'], 'id');
+        $b = array_column($selector->practice($exam, $subject, null, 10, null, 7)['questions'], 'id');
+
+        $this->assertSame($a, $b, 'same seed, same ten, for every student');
+    }
+
     public function test_a_passage_stays_attached_to_its_questions_and_is_never_split_by_shuffling(): void
     {
         [$exam, $subject] = $this->makeExamAndSubject();

@@ -2,7 +2,9 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { formatBytes, formatDate, naira } from '@/core/format';
+import { candidates, progressOf } from '@/core/selector';
 import { buildViews } from '@/core/views';
+import { answeredIds } from '@/db/progress';
 import type { Pack } from '@/core/types';
 import { useData, packKey } from '@/state/data';
 import { services } from '@/state/services';
@@ -32,6 +34,7 @@ export default function Practice() {
   const [mode, setMode] = useState<'instant' | 'end'>('instant');
   const [count, setCount] = useState(20);
   const [pack, setPack] = useState<Pack | null>(null);
+  const [seen, setSeen] = useState<Set<number>>(new Set());
 
   // Arrive from Home's "pick up where you stopped" with the exam and subject already chosen, and its options open.
   useEffect(() => {
@@ -48,6 +51,7 @@ export default function Practice() {
     setTopicId(null);
     if (!exam || !subject) { setPack(null); return; }
     services().packs.load(exam.slug, subject.slug).then((p) => { if (live) setPack(p); });
+    answeredIds(services().db).then((ids) => { if (live) setSeen(ids); }).catch(() => {});
     return () => { live = false; };
   }, [exam?.slug, subject?.slug, subject?.installed?.version]);
 
@@ -59,6 +63,9 @@ export default function Practice() {
       params: { exam: exam.slug, subject: subject.slug, mode, count: String(count), ...(year ? { year: String(year) } : {}), ...(topicId ? { topic: String(topicId) } : {}) },
     });
   };
+
+  // "You have answered 120 of 350": new questions come first, and the student is told when they have done them all.
+  const done = useMemo(() => (pack ? progressOf(candidates(pack, { year, topicId }), seen) : null), [pack, year, topicId, seen]);
 
   const choose = (slug: string) => { setSubjectSlug(slug); setOpen(true); };
 
@@ -170,6 +177,9 @@ export default function Practice() {
         <View style={{ gap: 10 }}>
           <T variant="h3">Number of questions</T>
           <Row wrap style={{ gap: 8 }}>{counts.map((n) => <Chip key={n} label={String(n)} selected={count === n} onPress={() => setCount(n)} />)}</Row>
+          {done && done.total > 0 ? (
+            <T variant="tiny" muted>{done.fresh === 0 ? `You have answered all ${done.total} questions here, so some will repeat. That is good revision.` : done.answered === 0 ? 'Every question here is new to you.' : `You have answered ${done.answered} of ${done.total}. Questions you have not seen come first.`}</T>
+          ) : null}
         </View>
       </Sheet>
     </Screen>
