@@ -14,7 +14,7 @@
 @section('body')
 <div class="auth-wrap">
     <header class="pub-top">
-        <a class="brand" href="{{ route('welcome') }}"><span class="brand-mark"><x-icon name="check" size="s"/></span>TestaCBT</a>
+        <a class="brand" href="{{ route('welcome') }}"><span class="brand-mark"><x-logo :size="34"/></span>TestaCBT</a>
         <nav class="pub-links" aria-label="Site">
             @foreach($links as [$label, $url, $route])
                 <a href="{{ $url }}" class="{{ request()->routeIs($route) || request()->routeIs($route . '.*') ? 'on' : '' }}">{{ $label }}</a>
@@ -40,7 +40,7 @@
     <footer class="footer">
         <div class="footer-cols">
             <div>
-                <a class="brand" href="{{ route('welcome') }}" style="padding:0"><span class="brand-mark"><x-icon name="check" size="s"/></span>TestaCBT</a>
+                <a class="brand" href="{{ route('welcome') }}" style="padding:0"><span class="brand-mark"><x-logo :size="34"/></span>TestaCBT</a>
                 <p style="margin-top:10px;max-width:34ch">Practise {{ app(\App\Support\SiteInfo::class)->examNames() }} past questions, on the web or on your phone.</p>
             </div>
             <div><h4>Learn</h4><a href="{{ route('register') }}">Create a free account</a><a href="{{ route('pricing') }}">Pricing</a><a href="{{ route('download') }}">Get the app</a></div>

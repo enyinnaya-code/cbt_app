@@ -49,7 +49,7 @@
 <header class="topbar">
     <div class="topbar-in">
         <a class="brand" href="{{ route('welcome') }}" aria-label="TestaCBT website">
-            <span class="brand-mark"><x-icon name="check" size="s"/></span>TestaCBT
+            <span class="brand-mark"><x-logo :size="34"/></span>TestaCBT
         </a>
         <nav class="topnav" aria-label="Main">
             @foreach($nav as [$label, $routeName, $icon, $pattern])
