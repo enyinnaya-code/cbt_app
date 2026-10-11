@@ -53,7 +53,7 @@ export const downloader: Downloader = {
   async download(url, headers, onProgress, signal) {
     const dir = new Directory(Paths.cache, 'downloads');
     if (!dir.exists) dir.create({ intermediates: true });
-    const target = new File(dir, `pack-${Date.now()}.gz`);
+    const target = new File(dir, `pack-${Crypto.randomUUID()}.gz`);
 
     const file = await File.downloadFileAsync(url, target, {
       headers,

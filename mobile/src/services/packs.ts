@@ -56,6 +56,34 @@ interface Row {
   question_count: number; paper_count: number; years: string; starter: number; installed_at: string;
 }
 
+/** Tries a download makes before giving up, and the waits between them (a weak signal often comes back within seconds). */
+export const DOWNLOAD_TRIES = 3;
+const RETRY_WAITS_MS = [1500, 4000];
+
+/**
+ * Says what actually went wrong instead of blaming the connection every time. Returns whether another try could help.
+ * A server that answers with an error, a full phone and a lost signal need different words, and the first two are not
+ * fixed by checking the connection.
+ */
+export function explainDownloadError(e: unknown): { message: string; retry: boolean } {
+  const text = e instanceof Error ? e.message : String(e ?? '');
+  const status = /(?:status|http|code)[^0-9]{0,8}([45][0-9][0-9])(?![0-9])/i.exec(text)?.[1];
+
+  if (/ENOSPC|no space|not enough (storage|space)|disk full/i.test(text)) {
+    return { message: 'There is not enough space on your phone. Free some space and try again.', retry: false };
+  }
+  if (status === '401' || status === '403') {
+    return { message: 'The server did not accept this download. Sign out, sign in again and try once more.', retry: false };
+  }
+  if (status === '404') {
+    return { message: 'This subject is not ready on the server yet. Please try again later.', retry: false };
+  }
+  if (status) {
+    return { message: `The server had a problem (${status}). Please try again in a few minutes.`, retry: true };
+  }
+  return { message: 'The download was interrupted. Check your connection and try again.', retry: true };
+}
+
 const toMeta = (r: Row): PackMeta => ({ ...r, years: JSON.parse(r.years), starter: r.starter === 1 });
 
 export class PackManager {
@@ -68,6 +96,7 @@ export class PackManager {
     private readonly sha256: Sha256,
     private readonly api: Api,
     private readonly now: () => Date = () => new Date(),
+    private readonly sleep: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   ) {}
 
   async installed(): Promise<PackMeta[]> {
@@ -90,12 +119,18 @@ export class PackManager {
     const entry = subject.pack;
     if (!entry) throw new PackError('There is no pack for this subject yet.', 'download');
 
-    let bytes: Uint8Array;
-    try {
-      bytes = await this.downloader.download(this.api.url(entry.url), this.api.headers(), onProgress, signal);
-    } catch (e) {
-      if (signal?.aborted) throw new PackError('Download cancelled.', 'cancelled');
-      throw new PackError('The download failed. Check your connection and try again.', 'download');
+    // A dropped signal or a busy server is usually over in seconds, so try a few times before bothering the student.
+    let bytes: Uint8Array | null = null;
+    for (let attempt = 1; bytes === null; attempt++) {
+      try {
+        bytes = await this.downloader.download(this.api.url(entry.url), this.api.headers(), onProgress, signal);
+      } catch (e) {
+        if (signal?.aborted) throw new PackError('Download cancelled.', 'cancelled');
+        const why = explainDownloadError(e);
+        if (!why.retry || attempt >= DOWNLOAD_TRIES) throw new PackError(why.message, 'download');
+        await this.sleep(RETRY_WAITS_MS[attempt - 1] ?? 4000);
+        if (signal?.aborted) throw new PackError('Download cancelled.', 'cancelled');
+      }
     }
 
     // A truncated or tampered file must never be installed.

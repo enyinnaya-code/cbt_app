@@ -91,7 +91,7 @@
                             </span>
                             <span>
                                 <span class="h3" style="display:block">{{ $s->name }}</span>
-                                <span class="small muted">{{ min($s->planned, $s->available) }} questions{{ $s->available < $s->planned ? ', all we have' : '' }}</span>
+                                <span class="small muted">{{ min($s->planned, $s->available) }} questions{{ $s->available < $s->planned ? ', all we have' : ($s->available > $s->planned ? ', picked at random from ' . $s->available : '') }}</span>
                             </span>
                         </label>
                     @endforeach

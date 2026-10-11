@@ -1,7 +1,7 @@
 import { gzipSync, strToU8 } from 'fflate';
 import { createHash } from 'crypto';
 import { Api } from '@/services/api';
-import { PackError, PackManager, type Downloader, type PackFiles } from '@/services/packs';
+import { DOWNLOAD_TRIES, PackError, PackManager, explainDownloadError, type Downloader, type PackFiles } from '@/services/packs';
 import { recordAttempt } from '@/db/progress';
 import type { Db } from '@/db/types';
 import { gz, instruction, makePack, mcq, subject } from './helpers/fixtures';
@@ -70,13 +70,45 @@ describe('PackManager.download', () => {
     expect(await m.installed()).toHaveLength(0);
   });
 
-  it('reports a failed connection in plain words', async () => {
+  const noWait = () => Promise.resolve();
+
+  it('reports a lost connection in plain words, after trying again', async () => {
     const { files, api } = setup();
-    const m = new PackManager(db, files, { download: jest.fn().mockRejectedValue(new Error('socket hang up')) }, sha, api);
+    const download = jest.fn().mockRejectedValue(new Error('socket hang up'));
+    const m = new PackManager(db, files, { download }, sha, api, undefined, noWait);
 
     const e = (await m.download('jamb', catalogSubject(gz(physics()))).catch((x) => x)) as PackError;
     expect(e).toMatchObject({ kind: 'download' });
     expect(e.message).toMatch(/connection/i);
+    expect(download).toHaveBeenCalledTimes(DOWNLOAD_TRIES);
+  });
+
+  it('recovers when a retry works', async () => {
+    const bytes = gz(physics());
+    const { files, api } = setup();
+    const download = jest.fn().mockRejectedValueOnce(new Error('socket hang up')).mockResolvedValue(bytes);
+    const m = new PackManager(db, files, { download }, sha, api, undefined, noWait);
+
+    await expect(m.download('jamb', catalogSubject(bytes))).resolves.toMatchObject({ question_count: 3 });
+    expect(download).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not blame the connection when the server says no, and does not keep retrying a missing pack', async () => {
+    const { files, api } = setup();
+    const download = jest.fn().mockRejectedValue(new Error('Download failed with status 404'));
+    const m = new PackManager(db, files, { download }, sha, api, undefined, noWait);
+
+    const e = (await m.download('jamb', catalogSubject(gz(physics()))).catch((x) => x)) as PackError;
+    expect(e.message).toMatch(/not ready on the server/i);
+    expect(e.message).not.toMatch(/connection/i);
+    expect(download).toHaveBeenCalledTimes(1);
+  });
+
+  it('explains each kind of failure differently', () => {
+    expect(explainDownloadError(new Error('write failed: ENOSPC'))).toMatchObject({ retry: false, message: expect.stringMatching(/space/i) });
+    expect(explainDownloadError(new Error('HTTP 500 Internal Server Error'))).toMatchObject({ retry: true, message: expect.stringMatching(/\(500\)/) });
+    expect(explainDownloadError(new Error('status 403'))).toMatchObject({ retry: false });
+    expect(explainDownloadError(new Error('Failed to connect to testacbt.com/1.2.3.4:443'))).toMatchObject({ retry: true, message: expect.stringMatching(/connection/i) });
   });
 
   it('can be cancelled', async () => {

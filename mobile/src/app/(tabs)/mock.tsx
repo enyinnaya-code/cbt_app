@@ -164,7 +164,7 @@ export default function Mock() {
                         <SubjectTile code={s.code} index={s.index} size={40} />
                         {locked ? <Badge label="Compulsory" kind="green" /> : on ? <Icon name="check" size={18} color={c.primary} /> : null}
                       </Row>
-                      <View><T variant="h3">{s.name}</T><T variant="small" muted>{Math.min(have, want)} questions{have < want ? ', all we have' : ''}</T></View>
+                      <View><T variant="h3">{s.name}</T><T variant="small" muted>{Math.min(have, want)} questions{have < want ? ', all we have' : have > want ? `, picked at random from ${have}` : ''}</T></View>
                     </Pressable>
                   );
                 })}
